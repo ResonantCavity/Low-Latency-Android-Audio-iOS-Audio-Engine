@@ -15,6 +15,7 @@
 // This callback is called periodically by the audio system.
 static bool audioProcessing(void *clientdata, float **buffers, unsigned int inputChannels, unsigned int outputChannels, unsigned int numberOfSamples, unsigned int samplerate, uint64_t hostTime) {
     __unsafe_unretained ViewController *self = (__bridge ViewController *)clientdata;
+    NSLog(@"input channels %d, output channels %d, samples %d, rate %d", inputChannels, outputChannels, numberOfSamples, samplerate);
     // Input goes to the frequency domain.
     float interleaved[numberOfSamples * 2 + 16];
     SuperpoweredInterleave(buffers[0], buffers[1], interleaved, numberOfSamples);

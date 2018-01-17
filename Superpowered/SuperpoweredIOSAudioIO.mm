@@ -222,11 +222,12 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
         } else if ([port.portType isEqualToString:AVAudioSessionPortBuiltInReceiver]) receiverAvailable = true;
     };
 
-    if (receiverAvailable && !usbOrHDMIAvailable) { // Comment this out if you would like to use the receiver instead.
-        [[AVAudioSession sharedInstance] overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:nil];
-        [self performSelectorOnMainThread:@selector(onRouteChange:) withObject:nil waitUntilDone:NO];
-        return;
-    };
+// COMMENTED OUT BY REZCAV TO SO WE DON'T HAVE TO MANAGE THIS CRAP. WISH THERE WAS AN API. OH WELL. 
+    // if (receiverAvailable && !usbOrHDMIAvailable) { // Comment this out if you would like to use the receiver instead.
+    //     [[AVAudioSession sharedInstance] overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:nil];
+    //     [self performSelectorOnMainThread:@selector(onRouteChange:) withObject:nil waitUntilDone:NO];
+    //     return;
+    // };
 
     memset(RemoteIOOutputChannelMap, 0, sizeof(RemoteIOOutputChannelMap));
     outputChannelMap.headphoneAvailable = false;
