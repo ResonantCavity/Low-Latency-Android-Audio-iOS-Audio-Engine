@@ -14,6 +14,7 @@ _Pragma("clang diagnostic pop")                                     \
 }
 
 #define USES_AUDIO_INPUT 1
+#define ALLOW_BLUETOOTH 1
 
 typedef enum audioDeviceType {
     audioDeviceType_USB = 1, audioDeviceType_headphone = 2, audioDeviceType_HDMI = 3, audioDeviceType_other = 4
@@ -60,6 +61,7 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
 
 - (id)initWithDelegate:(NSObject<SuperpoweredIOSAudioIODelegate> *)d preferredBufferSize:(unsigned int)preferredBufferSize preferredMinimumSamplerate:(unsigned int)prefsamplerate audioSessionCategory:(NSString *)category channels:(int)channels audioProcessingCallback:(audioProcessingCallback)callback clientdata:(void *)clientdata {
     self = [super init];
+    NSLog(@"initWithDelegate");
     if (self) {
         iOS6 = ([[[UIDevice currentDevice] systemVersion] compare:@"6.0" options:NSNumericSearch] != NSOrderedAscending);
         numChannels = !iOS6 ? 2 : channels;
@@ -104,6 +106,7 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
             SILENCE_DEPRECATION(s.delegate = (id<AVAudioSessionDelegate>)self); // iOS 5 compatibility
         };
     };
+    
     return self;
 }
 
@@ -307,7 +310,9 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
 }
 
 - (void)resetAudio {
+    NSLog(@"Resetting audio");
     if (audioUnit != NULL) {
+         NSLog(@"Disposing of existing unit");
         AudioUnitUninitialize(audioUnit);
         AudioComponentInstanceDispose(audioUnit);
         audioUnit = NULL;
@@ -323,8 +328,10 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
         }
     };
 #ifdef ALLOW_BLUETOOTH
-    if (multiRoute)  [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryMultiRoute error:NULL];
-    else [[AVAudioSession sharedInstance] setCategory:audioSessionCategory withOptions:AVAudioSessionCategoryOptionAllowBluetoothA2DP | AVAudioSessionCategoryOptionMixWithOthers error:NULL];
+    if (multiRoute)  {[[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryMultiRoute error:NULL];
+    } else {
+        [[AVAudioSession sharedInstance] setCategory:audioSessionCategory withOptions:AVAudioSessionCategoryOptionAllowBluetoothA2DP | AVAudioSessionCategoryOptionMixWithOthers error:NULL];
+    }
 #else
     [[AVAudioSession sharedInstance] setCategory:multiRoute ? AVAudioSessionCategoryMultiRoute : audioSessionCategory error:NULL];
 #endif
@@ -392,22 +399,26 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
 }
 
 - (AudioUnit)createRemoteIO {
+    NSLog(@"Creating remote IO");
     AudioUnit au;
 
     AudioComponentDescription desc;
-	desc.componentType = kAudioUnitType_Output;
-	desc.componentSubType = kAudioUnitSubType_RemoteIO;
-	desc.componentFlags = 0;
-	desc.componentFlagsMask = 0;
-	desc.componentManufacturer = kAudioUnitManufacturer_Apple;
-	AudioComponent component = AudioComponentFindNext(NULL, &desc);
-	if (AudioComponentInstanceNew(component, &au) != 0) return NULL;
+    desc.componentType = kAudioUnitType_Output;
+    desc.componentSubType = kAudioUnitSubType_RemoteIO;
+    desc.componentFlags = 0;
+    desc.componentFlagsMask = 0;
+    desc.componentManufacturer = kAudioUnitManufacturer_Apple;
+    AudioComponent component = AudioComponentFindNext(NULL, &desc);
+    if (AudioComponentInstanceNew(component, &au) != 0){
+        NSLog(@"Error creating new AudioComponentInstance");
+        return NULL;
+    }
 
     bool recordOnly = [audioSessionCategory isEqualToString:AVAudioSessionCategoryRecord];
     UInt32 value = recordOnly ? 0 : 1;
-	if (AudioUnitSetProperty(au, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Output, 0, &value, sizeof(value))) { AudioComponentInstanceDispose(au); return NULL; };
+    if (AudioUnitSetProperty(au, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Output, 0, &value, sizeof(value))) { AudioComponentInstanceDispose(au); return NULL; };
     value = inputEnabled ? 1 : 0;
-	if (AudioUnitSetProperty(au, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, 1, &value, sizeof(value))) { AudioComponentInstanceDispose(au); return NULL; };
+    if (AudioUnitSetProperty(au, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, 1, &value, sizeof(value))) { AudioComponentInstanceDispose(au); return NULL; };
 
     AudioUnitAddPropertyListener(au, kAudioUnitProperty_StreamFormat, streamFormatChangedCallback, (__bridge void *)self);
 
@@ -419,34 +430,46 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
     samplerate = (int)format.mSampleRate;
     [self setSamplerateAndBuffersize];
 
-	format.mFormatID = kAudioFormatLinearPCM;
+    format.mFormatID = kAudioFormatLinearPCM;
     format.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked | kAudioFormatFlagIsNonInterleaved | kAudioFormatFlagsNativeEndian;
     format.mBitsPerChannel = 32;
-	format.mFramesPerPacket = 1;
+    format.mFramesPerPacket = 1;
     format.mBytesPerFrame = 4;
     format.mBytesPerPacket = 4;
     format.mChannelsPerFrame = numChannels;
     if (AudioUnitSetProperty(au, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &format, sizeof(format))) { AudioComponentInstanceDispose(au); return NULL; };
     if (AudioUnitSetProperty(au, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, &format, sizeof(format))) { AudioComponentInstanceDispose(au); return NULL; };
 
-	AURenderCallbackStruct callbackStruct;
-	callbackStruct.inputProc = coreAudioProcessingCallback;
-	callbackStruct.inputProcRefCon = (__bridge void *)self;
+    AURenderCallbackStruct callbackStruct;
+    callbackStruct.inputProc = coreAudioProcessingCallback;
+    callbackStruct.inputProcRefCon = (__bridge void *)self;
     if (recordOnly) {
         if (AudioUnitSetProperty(au, kAudioOutputUnitProperty_SetInputCallback, kAudioUnitScope_Global, 1, &callbackStruct, sizeof(callbackStruct))) { AudioComponentInstanceDispose(au); return NULL; };
     } else {
         if (AudioUnitSetProperty(au, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &callbackStruct, sizeof(callbackStruct))) { AudioComponentInstanceDispose(au); return NULL; };
     };
-
-	if (AudioUnitInitialize(au)) { AudioComponentInstanceDispose(au); return NULL; };
+    OSStatus status = AudioUnitInitialize(au);
+    if (status != 0) {
+        NSLog(@"Initialization failed with error %d", status);
+        AudioComponentInstanceDispose(au);
+        return NULL;
+    };
+    
+    NSLog(@"Successfully created new AudioUnit");
     return au;
 }
 
 // Public methods
 - (bool)start {
     started = true;
-    if (audioUnit == NULL) return false;
-    if (AudioOutputUnitStart(audioUnit)) return false;
+    if (audioUnit == NULL) {
+        NSLog(@"audioUnit is null");
+        return false;
+    }
+    if (AudioOutputUnitStart(audioUnit)){
+        NSLog(@"Call to AudioOutputUnitStart failed");
+        return false;
+    }
     audioUnitRunning = true;
     [[AVAudioSession sharedInstance] setActive:YES error:nil];
     return true;
@@ -516,6 +539,10 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
 #else
     [self onMediaServerReset:nil];
 #endif
+}
+
+- (AudioComponentInstance) getAudioComponentInstance{
+    return audioUnit;
 }
 
 @end

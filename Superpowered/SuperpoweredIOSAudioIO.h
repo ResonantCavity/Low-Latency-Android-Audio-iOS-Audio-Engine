@@ -112,6 +112,10 @@ typedef bool (*audioProcessingCallback) (void *clientdata, float **buffers, unsi
  */
 - (id)initWithDelegate:(id<SuperpoweredIOSAudioIODelegate>)delegate preferredBufferSize:(unsigned int)preferredBufferSize preferredMinimumSamplerate:(unsigned int)preferredMinimumSamplerate audioSessionCategory:(NSString *)audioSessionCategory channels:(int)channels audioProcessingCallback:(audioProcessingCallback)callback clientdata:(void *)clientdata;
 
+/** Get the audio unit
+ */
+- (AudioComponentInstance) getAudioComponentInstance;
+
 /**
  @brief Starts audio processing.
  
@@ -166,5 +170,4 @@ typedef bool (*audioProcessingCallback) (void *clientdata, float **buffers, unsi
  @param outputsAndInputs A human readable description about the available outputs and inputs.
  */
 - (void)mapChannels:(multiOutputChannelMap *)outputMap inputMap:(multiInputChannelMap *)inputMap externalAudioDeviceName:(NSString *)externalAudioDeviceName outputsAndInputs:(NSString *)outputsAndInputs;
-
 @end
