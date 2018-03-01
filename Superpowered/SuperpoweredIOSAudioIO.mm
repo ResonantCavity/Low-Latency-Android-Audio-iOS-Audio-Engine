@@ -177,7 +177,7 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
 
 - (void)onAudioSessionInterrupted:(NSNotification *)notification {
     NSNumber *interruption = [notification.userInfo objectForKey:AVAudioSessionInterruptionTypeKey];
-    if (interruption) switch ([interruption intValue]) {
+    if (interruption != nil) switch ([interruption intValue]) {
         case AVAudioSessionInterruptionTypeBegan: {
             bool wasSuspended = false;
 #pragma clang diagnostic push
@@ -185,7 +185,7 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
             if (&AVAudioSessionInterruptionWasSuspendedKey != NULL) {
 #pragma clang diagnostic pop
                 NSNumber *obj = [notification.userInfo objectForKey:AVAudioSessionInterruptionWasSuspendedKey];
-                if (obj && ([obj boolValue] == TRUE)) wasSuspended = true;
+                if ((obj != nil) && ([obj boolValue] == TRUE)) wasSuspended = true;
             }
             if (!wasSuspended) {
                 if (audioUnitRunning) [self performSelectorOnMainThread:@selector(startDelegateInterruption) withObject:nil waitUntilDone:NO];
@@ -374,7 +374,7 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
     __unsafe_unretained SuperpoweredIOSAudioIO *self = (__bridge SuperpoweredIOSAudioIO *)inRefCon;
     if (!ioData) ioData = self->inputBufferListForRecordingCategory;
     div_t d = div(inNumberFrames, 8);
-    if ((d.rem != 0) || (inNumberFrames < self->minimumNumberOfFrames) || (inNumberFrames > self->maximumNumberOfFrames) || (ioData->mNumberBuffers != self->numChannels)) {
+    if ((d.rem != 0) || ((int)inNumberFrames < self->minimumNumberOfFrames) || ((int)inNumberFrames > self->maximumNumberOfFrames) || ((int)ioData->mNumberBuffers != self->numChannels)) {
         return kAudioUnitErr_InvalidParameter;
     };
 
