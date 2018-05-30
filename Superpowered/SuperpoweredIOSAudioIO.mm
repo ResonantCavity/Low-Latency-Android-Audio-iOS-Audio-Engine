@@ -296,7 +296,7 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
 
 - (void)setSamplerateAndBuffersize {
     if (samplerate > 0) {
-        double sr = samplerate < preferredMinimumSamplerate ? preferredMinimumSamplerate : 0, current;
+        double sr = samplerate < preferredMinimumSamplerate ? preferredMinimumSamplerate : samplerate, current;
         if (!iOS6) {
             SILENCE_DEPRECATION(current = [[AVAudioSession sharedInstance] preferredHardwareSampleRate]); // iOS 5 compatibility
         } else current = [[AVAudioSession sharedInstance] preferredSampleRate];
