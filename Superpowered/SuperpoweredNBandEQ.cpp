@@ -2,6 +2,14 @@
 #include <math.h>
 #include "SuperpoweredNBandEQ.h"
 
+#if _WIN32
+#include <atomic>
+#include <windows.h>
+#define ATOMICZERO(var) InterlockedAnd(&var, 0)
+#else
+#define ATOMICZERO(var) __sync_fetch_and_and(&var, 0)
+#endif
+
 typedef struct nbeqInternals {
     SuperpoweredFilter **filters;
     unsigned int newSamplerate;
@@ -72,7 +80,7 @@ bool SuperpoweredNBandEQ::process(float *input, float *output, unsigned int numb
     if (!input || !output || !numberOfSamples || !internals->numFilters) return false; // Some safety.
 
     // Change the sample rate of all filters at once if needed.
-    unsigned int newSamplerate = __sync_fetch_and_and(&internals->newSamplerate, 0);
+    long newSamplerate = ATOMICZERO(internals->newSamplerate);
     if (newSamplerate > 0) {
         for (int n = 0; n < internals->numFilters; n++) internals->filters[n]->setSamplerate(newSamplerate);
     }
