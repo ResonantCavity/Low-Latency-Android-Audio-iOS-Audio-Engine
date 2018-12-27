@@ -1,4 +1,4 @@
 mkdir Superpowered/Windows/Debug
-Superpowered/Windows/Release
+mkdir Superpowered/Windows/Release
 cp Superpowered/Windows/SuperpoweredWin141_Debug_MD_x64.lib Superpowered/Windows/Debug/SuperpoweredWin141_MD_x64.lib
 cp Superpowered/Windows/SuperpoweredWin141_Release_MD_x64.lib Superpowered/Windows/Release/SuperpoweredWin141_MD_x64.lib
