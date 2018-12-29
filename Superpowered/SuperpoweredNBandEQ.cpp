@@ -5,7 +5,7 @@
 #if _WIN32
 #include <atomic>
 #include <windows.h>
-#define ATOMICZERO(var) InterlockedAnd(&var, 0)
+#define ATOMICZERO(var) InterlockedAnd(&((long)var), 0L)
 #else
 #define ATOMICZERO(var) __sync_fetch_and_and(&var, 0)
 #endif
