@@ -3,16 +3,16 @@
 #include "SuperpoweredNBandEQ.h"
 
 #if _WIN32
+#include "Windows.h"
 #include <atomic>
-#include <windows.h>
-#define ATOMICZERO(var) InterlockedAnd(&((long)var), 0L)
+#define ATOMICZERO(var) InterlockedAnd(&var, 0)
 #else
 #define ATOMICZERO(var) __sync_fetch_and_and(&var, 0)
 #endif
 
 typedef struct nbeqInternals {
     SuperpoweredFilter **filters;
-    unsigned int newSamplerate;
+    long newSamplerate;
     int numFilters;
     bool lastEnabled;
 } nbeqInternals;
@@ -57,7 +57,7 @@ SuperpoweredNBandEQ::~SuperpoweredNBandEQ() {
 
 void SuperpoweredNBandEQ::setSamplerate(unsigned int samplerate) {
     // This method can be called from any thread. Setting the sample rate of all filters must be synchronous, in the audio processing thread.
-    internals->newSamplerate = samplerate;
+    internals->newSamplerate = (long)samplerate;
 }
 
 void SuperpoweredNBandEQ::enable(bool flag) {
@@ -82,7 +82,7 @@ bool SuperpoweredNBandEQ::process(float *input, float *output, unsigned int numb
     // Change the sample rate of all filters at once if needed.
     long newSamplerate = ATOMICZERO(internals->newSamplerate);
     if (newSamplerate > 0) {
-        for (int n = 0; n < internals->numFilters; n++) internals->filters[n]->setSamplerate(newSamplerate);
+        for (int n = 0; n < internals->numFilters; n++) internals->filters[n]->setSamplerate((unsigned int)newSamplerate);
     }
 
     // Switch all filters if needed.

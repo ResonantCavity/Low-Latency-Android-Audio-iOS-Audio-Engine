@@ -57,7 +57,7 @@ void SuperpoweredChangeVolumeAdd(float *input, float *output, float volumeStart,
 
 /**
  @fn SuperpoweredPeak(float *input, unsigned int numberOfValues);
- @return Returns with the peak value.
+ @return Returns the peak value.
 
  @param input An array of floating point values.
  @param numberOfValues The number of values to process. (2 * numberOfSamples for stereo input) Must be a multiply of 8.
@@ -391,8 +391,19 @@ void SuperpoweredStereoToMidSide(float *input, float *output, unsigned int numbe
 void SuperpoweredMidSideToStereo(float *input, float *output, unsigned int numberOfFrames);
 
 /**
+ @fn SuperpoweredDotProduct(float *input0, float *input1, unsigned int numValues)
+ @brief Calculates the dot product of two vectors.
+ 
+ @param input0 First input vector.
+ @param input1 Second input vector.
+ @param numValues Number of value pairs to process.
+ @return The dot product.
+ */
+float SuperpoweredDotProduct(float *input0, float *input1, unsigned int numValues);
+
+/**
  @fn SuperpoweredVersion()
- @return Returns with the current version of the Superpowered SDK.
+ @return Returns the current version of the Superpowered SDK.
  
  The returned value is 3 unsigned chars: major,minor,revision Example: 1,0,0 means 1.0.0
  */

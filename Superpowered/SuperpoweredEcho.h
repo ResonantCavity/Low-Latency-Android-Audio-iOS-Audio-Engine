@@ -12,8 +12,8 @@ struct echoInternals;
  @param dry >= 0.0f and <= 1.0f. Read only.
  @param wet >= 0.0f and <= 1.0f. Read only.
  @param bpm >= 40.0f and <= 250.0f. Read-write.
- @param beats Delay in beats, >= 0.125f and <= 2.0f. Read-write.
- @param decay >= 0.0f and <= 1.0f. Read-write.
+ @param beats Delay in beats, >= 0.03125f and <= 2.0f. Read-write.
+ @param decay >= 0.0f and <= 0.99f. Read-write.
  */
 class SuperpoweredEcho: public SuperpoweredFX {
 public:

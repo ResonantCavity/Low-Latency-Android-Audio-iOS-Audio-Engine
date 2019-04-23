@@ -3,6 +3,7 @@
 #import <AudioUnit/AudioUnit.h>
 #import <MediaPlayer/MediaPlayer.h>
 #import <pthread.h>
+#include <mach/mach_time.h>
 
 // Helpers
 #define SILENCE_DEPRECATION(code)                                   \
@@ -43,11 +44,12 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
     multiOutputChannelMap outputChannelMap;
     multiInputChannelMap inputChannelMap;
     audioDeviceType RemoteIOOutputChannelMap[64];
-    int numChannels, silenceFrames, samplerate, minimumNumberOfFrames, maximumNumberOfFrames, preferredMinimumSamplerate;
+    uint64_t lastCallbackTime;
+    int numChannels, silenceFrames, samplerate, minimumNumberOfFrames, maximumNumberOfFrames;
     bool audioUnitRunning, iOS6, background, inputEnabled;
 }
 
-@synthesize preferredBufferSizeMs, saveBatteryInBackground, started;
+@synthesize preferredBufferSizeMs, preferredSamplerate, saveBatteryInBackground, started;
 
 - (void)createAudioBuffersForRecordingCategory {
     inputBufferListForRecordingCategory = (AudioBufferList *)malloc(sizeof(AudioBufferList) + (sizeof(AudioBuffer) * numChannels));
@@ -59,9 +61,8 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
     };
 }
 
-- (id)initWithDelegate:(NSObject<SuperpoweredIOSAudioIODelegate> *)d preferredBufferSize:(unsigned int)preferredBufferSize preferredMinimumSamplerate:(unsigned int)prefsamplerate audioSessionCategory:(NSString *)category channels:(int)channels audioProcessingCallback:(audioProcessingCallback)callback clientdata:(void *)clientdata {
+- (id)initWithDelegate:(NSObject<SuperpoweredIOSAudioIODelegate> *)d preferredBufferSize:(unsigned int)preferredBufferSize preferredSamplerate:(unsigned int)prefsamplerate audioSessionCategory:(NSString *)category channels:(int)channels audioProcessingCallback:(audioProcessingCallback)callback clientdata:(void *)clientdata {
     self = [super init];
-    NSLog(@"initWithDelegate");
     if (self) {
         iOS6 = ([[[UIDevice currentDevice] systemVersion] compare:@"6.0" options:NSNumericSearch] != NSOrderedAscending);
         numChannels = !iOS6 ? 2 : channels;
@@ -73,7 +74,7 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
         saveBatteryInBackground = true;
         started = false;
         preferredBufferSizeMs = preferredBufferSize;
-        preferredMinimumSamplerate = prefsamplerate;
+        preferredSamplerate = prefsamplerate;
 #if (USES_AUDIO_INPUT == 1)
         bool recordOnly = [category isEqualToString:AVAudioSessionCategoryRecord];
         inputEnabled = recordOnly || [category isEqualToString:AVAudioSessionCategoryPlayAndRecord];
@@ -90,12 +91,18 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
         samplerate = minimumNumberOfFrames = maximumNumberOfFrames = 0;
         externalAudioDeviceName = nil;
         audioUnit = NULL;
-        if (recordOnly) [self createAudioBuffersForRecordingCategory]; else inputBufferListForRecordingCategory = NULL;
+        inputBufferListForRecordingCategory = NULL;
+#if (USES_AUDIO_INPUT == 1)
+        if (recordOnly) [self createAudioBuffersForRecordingCategory];
+#endif
         stopTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:self selector:@selector(everySecond) userInfo:nil repeats:YES];
+#if !__has_feature(objc_arc)
+        [self release]; // to prevent NSTimer retaining this
+#endif
         [self resetAudio];
 
         // Need to listen for a few app and audio session related events.
-        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onForeground) name:UIApplicationWillEnterForegroundNotification object:nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onForeground) name:UIApplicationDidBecomeActiveNotification object:nil];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onBackground) name:UIApplicationDidEnterBackgroundNotification object:nil];
         if (iOS6) {
             [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onMediaServerReset:) name:AVAudioSessionMediaServicesWereResetNotification object:[AVAudioSession sharedInstance]];
@@ -105,6 +112,14 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
             AVAudioSession *s = [AVAudioSession sharedInstance];
             SILENCE_DEPRECATION(s.delegate = (id<AVAudioSessionDelegate>)self); // iOS 5 compatibility
         };
+        
+#if (USES_AUDIO_INPUT == 1)
+        if ((recordOnly || [category isEqualToString:AVAudioSessionCategoryPlayAndRecord]) && [[AVAudioSession sharedInstance] respondsToSelector:@selector(recordPermission)] && [[AVAudioSession sharedInstance] respondsToSelector:@selector(requestRecordPermission:)] && ([[AVAudioSession sharedInstance] recordPermission] != AVAudioSessionRecordPermissionGranted)) {
+            [[AVAudioSession sharedInstance] requestRecordPermission:^(BOOL granted) {
+                if (granted) [self onMediaServerReset:nil]; else [self->delegate recordPermissionRefused];
+            }];
+        };
+#endif
     };
     
     return self;
@@ -145,6 +160,18 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
     if (silenceFrames > samplerate) {
         [self beginInterruption];
         silenceFrames = 0;
+    } else if (!background && audioUnitRunning && started) { // If it should run...
+        mach_timebase_info_data_t timebase;
+        mach_timebase_info(&timebase);
+        uint64_t diff = mach_absolute_time() - lastCallbackTime;
+        diff *= timebase.numer;
+        diff /= timebase.denom;
+        if (diff > 1000000000) { // But it didn't call the audio processing callback in the past second.
+            audioUnitRunning = false;
+            [[AVAudioSession sharedInstance] setActive:NO error:nil];
+            [self resetAudio];
+            [self start];
+        }
     }
 }
 
@@ -294,25 +321,18 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
     if (usbOrHDMIAvailable) SILENCE_DEPRECATION([[MPMusicPlayerController applicationMusicPlayer] setVolume:1.0f]); // iOS 5 and iOS 6 compatibility
 }
 
-- (void)setSamplerateAndBuffersize {
-    if (samplerate > 0) {
-        double sr = samplerate < preferredMinimumSamplerate ? preferredMinimumSamplerate : samplerate, current;
-        if (!iOS6) {
-            SILENCE_DEPRECATION(current = [[AVAudioSession sharedInstance] preferredHardwareSampleRate]); // iOS 5 compatibility
-        } else current = [[AVAudioSession sharedInstance] preferredSampleRate];
-        if (current != sr) {
-            if (!iOS6) {
-                SILENCE_DEPRECATION([[AVAudioSession sharedInstance] setPreferredHardwareSampleRate:sr error:NULL]); // iOS 5 compatibility
-            } else [[AVAudioSession sharedInstance] setPreferredSampleRate:sr error:NULL];
-        };
-    };
+- (void)applyBuffersize {
     [[AVAudioSession sharedInstance] setPreferredIOBufferDuration:double(preferredBufferSizeMs) * 0.001 error:NULL];
 }
 
+- (void)applySamplerate {
+    if (!iOS6) { // iOS 5 compatibility
+        SILENCE_DEPRECATION([[AVAudioSession sharedInstance] setPreferredHardwareSampleRate:preferredSamplerate error:NULL]);
+    } else [[AVAudioSession sharedInstance] setPreferredSampleRate:preferredSamplerate error:NULL];
+}
+
 - (void)resetAudio {
-    NSLog(@"Resetting audio");
     if (audioUnit != NULL) {
-         NSLog(@"Disposing of existing unit");
         AudioUnitUninitialize(audioUnit);
         AudioComponentInstanceDispose(audioUnit);
         audioUnit = NULL;
@@ -328,15 +348,14 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
         }
     };
 #ifdef ALLOW_BLUETOOTH
-    if (multiRoute)  {[[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryMultiRoute error:NULL];
-    } else {
-        [[AVAudioSession sharedInstance] setCategory:audioSessionCategory withOptions:AVAudioSessionCategoryOptionAllowBluetoothA2DP | AVAudioSessionCategoryOptionMixWithOthers error:NULL];
-    }
+    if (multiRoute) [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryMultiRoute error:NULL];
+    else [[AVAudioSession sharedInstance] setCategory:audioSessionCategory withOptions:AVAudioSessionCategoryOptionAllowBluetoothA2DP | AVAudioSessionCategoryOptionMixWithOthers error:NULL];
 #else
     [[AVAudioSession sharedInstance] setCategory:multiRoute ? AVAudioSessionCategoryMultiRoute : audioSessionCategory error:NULL];
 #endif
     [[AVAudioSession sharedInstance] setMode:AVAudioSessionModeDefault error:NULL];
-    [self setSamplerateAndBuffersize];
+    [self applyBuffersize];
+    [self applySamplerate];
     [[AVAudioSession sharedInstance] setActive:YES error:NULL];
 
     audioUnit = [self createRemoteIO];
@@ -344,6 +363,14 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
         if (iOS6) [self onRouteChange:nil]; else [self mapChannels];
     };
 }
+
+/*
+ RemoteIO scopes and elements:
+ hardware -> element 1 input scope -> element 1 output scope -> app
+ app -> element 0 input scope -> element 0 output scope -> hardware
+ hardware input properties: element 1 input scope
+ hardware output properties: element 0 output scope
+ */
 
 // RemoteIO
 static void streamFormatChangedCallback(void *inRefCon, AudioUnit inUnit, AudioUnitPropertyID inID, AudioUnitScope inScope, AudioUnitElement inElement) {
@@ -361,20 +388,34 @@ static void streamFormatChangedCallback(void *inRefCon, AudioUnit inUnit, AudioU
     }
 
     if (format.mSampleRate != 0) {
+        int sr = (int)format.mSampleRate;
         __unsafe_unretained SuperpoweredIOSAudioIO *self = (__bridge SuperpoweredIOSAudioIO *)inRefCon;
-        self->samplerate = (int)format.mSampleRate;
-        int minimum = int(self->samplerate * 0.001f), maximum = int(self->samplerate * 0.025f);
-        self->minimumNumberOfFrames = (minimum >> 3) << 3;
-        self->maximumNumberOfFrames = (maximum >> 3) << 3;
-        [self performSelectorOnMainThread:@selector(setSamplerateAndBuffersize) withObject:nil waitUntilDone:NO];
+        if (self->samplerate != sr) {
+            self->samplerate = sr;
+            int minimum = int(self->samplerate * 0.001f), maximum = int(self->samplerate * 0.025f);
+            self->minimumNumberOfFrames = (minimum >> 3) << 3;
+            self->maximumNumberOfFrames = (maximum >> 3) << 3;
+            [self performSelectorOnMainThread:@selector(applyBuffersize) withObject:nil waitUntilDone:NO];
+        }
     }
 }
 
 static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
     __unsafe_unretained SuperpoweredIOSAudioIO *self = (__bridge SuperpoweredIOSAudioIO *)inRefCon;
+    self->lastCallbackTime = mach_absolute_time();
+    
     if (!ioData) ioData = self->inputBufferListForRecordingCategory;
     div_t d = div(inNumberFrames, 8);
-    if ((d.rem != 0) || ((int)inNumberFrames < self->minimumNumberOfFrames) || ((int)inNumberFrames > self->maximumNumberOfFrames) || ((int)ioData->mNumberBuffers != self->numChannels)) {
+    if (d.rem != 0) {
+        // Core Audio performs sample rate conversion, but received no streamFormatChangedCallback. Recreate audio I/O for perfect match with hardware.
+        if (self->audioUnitRunning) {
+            self->audioUnitRunning = false;
+            [self performSelectorOnMainThread:@selector(onMediaServerReset:) withObject:nil waitUntilDone:NO];
+        }
+        return kAudioUnitErr_InvalidParameter;
+    }
+    
+    if (((int)inNumberFrames < self->minimumNumberOfFrames) || ((int)inNumberFrames > self->maximumNumberOfFrames) || ((int)ioData->mNumberBuffers != self->numChannels)) {
         return kAudioUnitErr_InvalidParameter;
     };
 
@@ -385,7 +426,7 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
     bool silence = true;
 
     // Make audio output.
-    silence = !self->processingCallback(self->processingClientdata, bufs, inputChannels, self->numChannels, inNumberFrames, self->samplerate, inTimeStamp->mHostTime);
+    silence = !self->processingCallback(self->processingClientdata, bufs, inputChannels, bufs, self->numChannels, inNumberFrames, self->samplerate, inTimeStamp->mHostTime);
 
     if (silence) { // Despite of ioActionFlags, it outputs garbage sometimes, so must zero the buffers:
         *ioActionFlags |= kAudioUnitRenderAction_OutputIsSilence;
@@ -399,26 +440,22 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
 }
 
 - (AudioUnit)createRemoteIO {
-    NSLog(@"Creating remote IO");
     AudioUnit au;
 
     AudioComponentDescription desc;
-    desc.componentType = kAudioUnitType_Output;
-    desc.componentSubType = kAudioUnitSubType_RemoteIO;
-    desc.componentFlags = 0;
-    desc.componentFlagsMask = 0;
-    desc.componentManufacturer = kAudioUnitManufacturer_Apple;
-    AudioComponent component = AudioComponentFindNext(NULL, &desc);
-    if (AudioComponentInstanceNew(component, &au) != 0){
-        NSLog(@"Error creating new AudioComponentInstance");
-        return NULL;
-    }
+	desc.componentType = kAudioUnitType_Output;
+	desc.componentSubType = kAudioUnitSubType_RemoteIO;
+	desc.componentFlags = 0;
+	desc.componentFlagsMask = 0;
+	desc.componentManufacturer = kAudioUnitManufacturer_Apple;
+	AudioComponent component = AudioComponentFindNext(NULL, &desc);
+	if (AudioComponentInstanceNew(component, &au) != 0) return NULL;
 
     bool recordOnly = [audioSessionCategory isEqualToString:AVAudioSessionCategoryRecord];
     UInt32 value = recordOnly ? 0 : 1;
-    if (AudioUnitSetProperty(au, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Output, 0, &value, sizeof(value))) { AudioComponentInstanceDispose(au); return NULL; };
+	if (AudioUnitSetProperty(au, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Output, 0, &value, sizeof(value))) { AudioComponentInstanceDispose(au); return NULL; };
     value = inputEnabled ? 1 : 0;
-    if (AudioUnitSetProperty(au, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, 1, &value, sizeof(value))) { AudioComponentInstanceDispose(au); return NULL; };
+	if (AudioUnitSetProperty(au, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, 1, &value, sizeof(value))) { AudioComponentInstanceDispose(au); return NULL; };
 
     AudioUnitAddPropertyListener(au, kAudioUnitProperty_StreamFormat, streamFormatChangedCallback, (__bridge void *)self);
 
@@ -428,48 +465,35 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
     AudioUnitGetProperty(au, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &format, &size);
 
     samplerate = (int)format.mSampleRate;
-    [self setSamplerateAndBuffersize];
 
-    format.mFormatID = kAudioFormatLinearPCM;
+	format.mFormatID = kAudioFormatLinearPCM;
     format.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked | kAudioFormatFlagIsNonInterleaved | kAudioFormatFlagsNativeEndian;
     format.mBitsPerChannel = 32;
-    format.mFramesPerPacket = 1;
+	format.mFramesPerPacket = 1;
     format.mBytesPerFrame = 4;
     format.mBytesPerPacket = 4;
     format.mChannelsPerFrame = numChannels;
     if (AudioUnitSetProperty(au, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &format, sizeof(format))) { AudioComponentInstanceDispose(au); return NULL; };
     if (AudioUnitSetProperty(au, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, &format, sizeof(format))) { AudioComponentInstanceDispose(au); return NULL; };
 
-    AURenderCallbackStruct callbackStruct;
-    callbackStruct.inputProc = coreAudioProcessingCallback;
-    callbackStruct.inputProcRefCon = (__bridge void *)self;
+	AURenderCallbackStruct callbackStruct;
+	callbackStruct.inputProc = coreAudioProcessingCallback;
+	callbackStruct.inputProcRefCon = (__bridge void *)self;
     if (recordOnly) {
-        if (AudioUnitSetProperty(au, kAudioOutputUnitProperty_SetInputCallback, kAudioUnitScope_Global, 1, &callbackStruct, sizeof(callbackStruct))) { AudioComponentInstanceDispose(au); return NULL; };
+        if (AudioUnitSetProperty(au, kAudioOutputUnitProperty_SetInputCallback, kAudioUnitScope_Global, 0, &callbackStruct, sizeof(callbackStruct))) { AudioComponentInstanceDispose(au); return NULL; };
     } else {
         if (AudioUnitSetProperty(au, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &callbackStruct, sizeof(callbackStruct))) { AudioComponentInstanceDispose(au); return NULL; };
     };
-    OSStatus status = AudioUnitInitialize(au);
-    if (status != 0) {
-        NSLog(@"Initialization failed with error %d", status);
-        AudioComponentInstanceDispose(au);
-        return NULL;
-    };
-    
-    NSLog(@"Successfully created new AudioUnit");
+
+	if (AudioUnitInitialize(au)) { AudioComponentInstanceDispose(au); return NULL; };
     return au;
 }
 
 // Public methods
 - (bool)start {
     started = true;
-    if (audioUnit == NULL) {
-        NSLog(@"audioUnit is null");
-        return false;
-    }
-    if (AudioOutputUnitStart(audioUnit)){
-        NSLog(@"Call to AudioOutputUnitStart failed");
-        return false;
-    }
+    if (audioUnit == NULL) return false;
+    if (AudioOutputUnitStart(audioUnit)) return false;
     audioUnitRunning = true;
     [[AVAudioSession sharedInstance] setActive:YES error:nil];
     return true;
@@ -481,8 +505,15 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
 }
 
 - (void)setPreferredBufferSizeMs:(int)ms {
+    if (ms == preferredBufferSizeMs) return;
     preferredBufferSizeMs = ms;
-    [self setSamplerateAndBuffersize];
+    [self applyBuffersize];
+}
+
+- (void)setPreferredSamplerate:(int)hz {
+    if (hz == preferredSamplerate) return;
+    preferredSamplerate = hz;
+    [self applySamplerate];
 }
 
 - (void)mapChannels {
@@ -506,8 +537,8 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
     };
 
 #if !TARGET_IPHONE_SIMULATOR
-    AudioUnitSetProperty(audioUnit, kAudioOutputUnitProperty_ChannelMap, kAudioUnitScope_Input, 0, outputmap, 128);
-    AudioUnitSetProperty(audioUnit, kAudioOutputUnitProperty_ChannelMap, kAudioUnitScope_Input, 1, inputmap, 128);
+    AudioUnitSetProperty(audioUnit, kAudioOutputUnitProperty_ChannelMap, kAudioUnitScope_Output, 0, outputmap, 128);
+    AudioUnitSetProperty(audioUnit, kAudioOutputUnitProperty_ChannelMap, kAudioUnitScope_Output, 1, inputmap, 128);
 #endif
 }
 
@@ -532,7 +563,7 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
         if ([[AVAudioSession sharedInstance] recordPermission] == AVAudioSessionRecordPermissionGranted) [self onMediaServerReset:nil];
         else {
             [[AVAudioSession sharedInstance] requestRecordPermission:^(BOOL granted) {
-                if (granted) [self onMediaServerReset:nil]; else [delegate recordPermissionRefused];
+                if (granted) [self onMediaServerReset:nil]; else [self->delegate recordPermissionRefused];
             }];
         };
     } else [self onMediaServerReset:nil];
