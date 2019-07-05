@@ -82,6 +82,8 @@ typedef struct multiInputChannelMap {
  */
 typedef bool (*audioProcessingCallback) (void *clientData, float **inputBuffers, unsigned int inputChannels, float **outputBuffers, unsigned int outputChannels, unsigned int numberOfSamples, unsigned int samplerate, unsigned long long hostTime);
 
+// For calling back to the audio service after a system callback reinitializes the audio unit
+typedef void (*resetCallback)(void);
 /**
  @brief Handles all audio session, audio lifecycle (interruptions), output, buffer size, samplerate and routing headaches.
  
@@ -114,7 +116,15 @@ typedef bool (*audioProcessingCallback) (void *clientData, float **inputBuffers,
  @param callback The audio processing callback.
  @param clientdata Custom data passed to the audio processing callback.
  */
-- (id)initWithDelegate:(id<SuperpoweredIOSAudioIODelegate>)delegate preferredBufferSize:(unsigned int)preferredBufferSize preferredSamplerate:(unsigned int)preferredSamplerate audioSessionCategory:(NSString *)audioSessionCategory channels:(int)channels audioProcessingCallback:(audioProcessingCallback)callback clientdata:(void *)clientdata;
+- (id)initWithDelegate:(id<SuperpoweredIOSAudioIODelegate>)delegate
+   preferredBufferSize:(unsigned int)preferredBufferSize
+   preferredSamplerate:(unsigned int)preferredSamplerate
+  audioSessionCategory:(NSString *)audioSessionCategory
+              channels:(int)channels
+audioProcessingCallback:(audioProcessingCallback)callback
+         resetCallback:(resetCallback)rc1
+         resetCallback:(resetCallback)rc2
+            clientdata:(void *)clientdata;
 
 /** Get the audio unit
  */
