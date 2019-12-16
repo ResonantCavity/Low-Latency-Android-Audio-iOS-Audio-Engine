@@ -4,12 +4,11 @@ import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.media.AudioManager;
-import android.os.Build;
 import android.os.Environment;
-import android.support.annotation.NonNull;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AppCompatActivity;
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.appcompat.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -46,7 +45,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[], @NonNull int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         // Called when the user answers to the permission dialogs.
         if ((requestCode != 0) || (grantResults.length < 1) || (grantResults.length != permissions.length)) return;
         boolean hasAllPermissions = true;
@@ -63,12 +62,10 @@ public class MainActivity extends AppCompatActivity {
         // Get the device's sample rate and buffer size to enable
         // low-latency Android audio output, if available.
         String samplerateString = null, buffersizeString = null;
-        if (Build.VERSION.SDK_INT >= 17) {
-            AudioManager audioManager = (AudioManager) this.getSystemService(Context.AUDIO_SERVICE);
-            if (audioManager != null) {
-                samplerateString = audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE);
-                buffersizeString = audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER);
-            }
+        AudioManager audioManager = (AudioManager) this.getSystemService(Context.AUDIO_SERVICE);
+        if (audioManager != null) {
+            samplerateString = audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE);
+            buffersizeString = audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER);
         }
         if (samplerateString == null) samplerateString = "48000";
         if (buffersizeString == null) buffersizeString = "480";
@@ -86,7 +83,7 @@ public class MainActivity extends AppCompatActivity {
     // Handle Start/Stop button toggle.
     public void ToggleStartStop(View button) {
         if (recording) {
-            StopAudio();
+            StopRecording();
             recording = false;
         } else {
             StartAudio(samplerate, buffersize, tempPath, destPath);
@@ -110,12 +107,12 @@ public class MainActivity extends AppCompatActivity {
 
     protected void onDestroy() {
         super.onDestroy();
-        if (recording) StopAudio();
+        if (recording) StopRecording();
     }
 
     // Functions implemented in the native library.
     private native void StartAudio(int samplerate, int buffersize, String tempPath, String destPath);
     private native void onForeground();
     private native void onBackground();
-    private native void StopAudio();
+    private native void StopRecording();
 }
