@@ -1,36 +1,28 @@
-<p align="center"><img width="450" src="http://superpowered.com/images/superpowered-animated.svg"></p>
+<p align="center"><img width="450" src="https://superpowered.com/images/superpowered-animated.svg"></p>
 
-Superpowered Interactive Audio Platform for Desktop, Mobile, IoT and Embedded Applications.
-
-Fully featured interactive audio for Games, VOIP, DAWs, Music Apps, Hi-Res Audio, Voice Assistants, Virtual, Augmented and Mixed Reality use-cases.
-
-Cross Platform on Android, iOS, macOS, tvOS, Linux and Windows.
+Superpowered Inc develops the leading portable C++ Audio SDK, C++ Networking SDK, and C++ Crypto SDK featuring low-power and real-time latency. With builds for Desktop, Mobile, IoT and Embedded Devices, portable and cross-platform on Android, iOS, macOS, tvOS, Linux and Windows as well as processor-specific builds for ARM32, ARM64, x86, and x64.
 
 
-# What is it?
+# Technology, SDKs and Code
 
-Low-power, real-time latency and cross-platform audio players, audio decoders, Fx, audio I/O, streaming, music analysis and spatialization, all optimized for interactive audio. 
+Superpowered Inc develops the following interactive audio, networking and cryptographics SDKs and infrastructure:
 
+### 1. Superpowered C++ Audio Library and SDK for Android, iOS, macOS, tvOS, Linux and Windows.
+Superpowered C++ Audio Library and SDK is the leading C++ Audio Library featuring low-power, real-time latency and cross-platform audio players, audio decoders, Fx (effects), audio I/O, streaming, music analysis and spatialization.
 
-# Supported Platforms
+For the most up-to-date feature list, see: https://superpowered.com/audio-library-sdk
 
-Superpowered is cross-platform: ALL SUPERPOWERED C++ CODE CAN BE COPY-PASTED between Android, iOS, macOS, tvOS, Linux and Windows.
+### 2. Superpowered C++ Networking Library and SDK for Android, iOS, macOS, tvOS, Linux and Windows.
+The Superpowered C++ Networking Library and SDK was designed from the ground-up to provide the easiest cross-platform way for a client to communicate with the back-end. It implements HTTP and HTTPS communication with custom data and header support, progress handling, file uploads/downloads and more. It reduces implementation, debug and maintenance time of typical tasks such as REST API requests, OAuth and bearer token authorization, or digital media streaming. It operates identically on all platforms, removing the pain of writing wrappers and finding quirks around the operating system's networking API, while it's fully self-contained and independent from it. The SDK also has a JSON parser to offer a complete package for your everyday networking and parsing needs.
 
+For the most up-to-date feature list, see: https://superpowered.com/networking-library-sdk
 
-# Superpowered Technologies
+### 3. Superpowered C++ Cryptographics Library and SDK for Android, iOS, macOS, tvOS, Linux and Windows.
+Superpowered Crypto offers the easiest cross-platform way to implement RSA public and private key cryptography, AES encryption and hashing functions (SHA, MD5). Unlike other cryptographics libraries designed for crypto enthusiasts with myriads of options and complex APIs, Superpowered Crypto has direct one-liner calls for signing, verification, encryption and decryption, solving the most common use-cases in the quickest way.
 
-Superpowered Inc develops the following interactive audio infrastructure:
+For the most up-to-date feature list, see: https://superpowered.com/crypto-library-sdk
 
-
-### 1. Superpowered Audio SDK for Android, iOS, macOS, tvOS, Linux and Windows.
-
-A fully-featured interactive audio platform with audio players, decoders, audio filters, effects and lower-level functions like FFTs and mixing.
-
-For the most recent and up-to-date feature list, see: http://superpowered.com/#comptable
-
-
-### 2. Superpowered HLS (HTTP Live Streaming) audio for Android, iOS, macOS, tvOS, Linux and Windows.
-
+### 4. Superpowered HLS (HTTP Live Streaming) audio for Android, iOS, macOS, tvOS, Linux and Windows.
 - VOD, live or event streams.
 - AAC-LC or MP3 audio encoding.
 - ADTS AAC, MP3 or MPEG-TS containers.
@@ -38,34 +30,24 @@ For the most recent and up-to-date feature list, see: http://superpowered.com/#c
 - Bandwidth measurement and selectable automatic stream switching.
 - Selectable download strategies.
 
-Background information: http://superpowered.com/http-live-streaming-for-android-superpowered-android-audio-io-and-audio-resampler
+Background information: https://superpowered.com/http-live-streaming-for-android-superpowered-android-audio-io-and-audio-resampler
 
+### 5. Superpowered USB Audio and USB MIDI for Android
+The Superpowered USB Audio and MIDI features for Android takes over MIDI device handling, providing low latency and low jitter (below 2 ms) access to MIDI devices for 1.4 billion Android devices, that is, 90+% of all Android devices on Google Play. It’s the Android equivalent of iOS Core Audio and Core MIDI for USB devices.
 
-### 3. Superpowered USB Audio and USB MIDI for Android
+For additional info, please see: https://superpowered.com/android-usb-audio-android-midi
 
-The Superpowered USB Audio and MIDI features for Android takes over MIDI device handling, providing low latency and low jitter (below 2 ms) access to MIDI devices for 1.2 billion Android devices, that is, 80+% of all Android devices on Google Play.
-It’s the Android equivalent of iOS Core Audio and Core MIDI for USB devices.
-
-For additional info, please see: http://superpowered.com/android-usb-audio-android-midi
-
-
-### 4. Superpowered Media Server for Android
-
-Superpowered has developed a system-space solution for Android&#39;s 10 ms Problem.
+### 6. Superpowered has developed a system-space solution for Android's 10 ms Problem.
 
 Interested parties should read:
 
-- http://superpowered.com/android-audio-low-latency-primer
-- http://superpowered.com/superpowered-android-media-server
+https://superpowered.com/android-audio-low-latency-primer
+https://superpowered.com/superpowered-android-media-server
 
 
-## PLEASE NOTE 1:
-To evaluate Superpowered Media Server for Android, please contact mediaserver@superpowered.com.
+# Supported Platforms
 
-
-### NOTE 2
-
-Windows builds are beta. Thank you for testing!
+Superpowered is cross-platform: ALL SUPERPOWERED C++ CODE CAN BE COPY-PASTED between Android, iOS, macOS, tvOS, Linux and Windows.
 
 
 # Folders
@@ -76,7 +58,7 @@ Windows builds are beta. Thank you for testing!
 
 - /Superpowered
 
-	The Audio SDK itself (static libraries and headers).
+	The SDKs (static libraries and headers).
 
 - /License
 
@@ -104,8 +86,6 @@ Windows builds are beta. Thank you for testing!
 
 - /SuperpoweredSpatializer
 
-	* Unity example project.
-	* Unity Native Audio Plugin example project for iOS, Android and OSX.
 	* Ambisonics (b-format) implementation based on the SuperpoweredSpatializer.
 
 
@@ -119,14 +99,6 @@ Four simple Universal Windows Platform example projects in a single Visual Studi
 - Use a single player to play HLS content.
 - Record the microphone input using SuperpoweredRecorder.
 - Use a single effect (input -> fx -> output).
-
-#### /Examples_Windows/Superpowered3BandEQVST
-
-A simple VST plugin project. Shows how to:
-
-- Build a VST equalizer plugin using Superpowered.
-- Build any Superpowered effect into a VST 2.x plugin.
-- Use Superpowered in an older VS 2013 project.
 
 #### /Examples_iOS/SuperpoweredCrossExample, /Examples_Android/CrossExample
 A fully-functional DJ app project example. Shows how to:
@@ -144,7 +116,7 @@ Simple time domain to frequency domain transformation with buffering and windowi
 - Use the SuperpoweredFrequencyDomain class.
 - Process the magnitudes and phases of the audio input.
 
-#### /Examples_iOS/uperpoweredHLSExample, /Examples_Android/HLSExample, /Examples_Linux/src/hls.cpp
+#### /Examples_iOS/uperpoweredHLSExample, /Examples_Linux/src/hls.cpp
 HTTP Live Streaming example project.
 
 #### /Examples_iOS/SuperpoweredOfflineProcessingExample, /Examples_Linux/src/offlineX.cpp
@@ -173,21 +145,17 @@ It compares several Superpowered features to Core Audio.
 	Swift note:
 	We have also tried creating this project in Swift, but it&#39;s not complete for audio and several features were impossible to implement (such as proper performance measurement). Swift is not designed for real-time audio. Fortunately, Objective-C++ files work great in Swift projects.
 
-#### /SuperpoweredSpatializer/SuperpoweredUnity (Unity)
+#### /Examples_Android/SuperpoweredEffect
 
-- A Unity example project with one scene having a spatialized sound and a wall.
-- Check SuperpoweredSpatializer.cs on how occlusion was implemented.
+Shows how to use a single effect (input -> fx -> output).
 
-#### /SuperpoweredSpatializer/src (Unity, Android, OSX)
+#### /Examples_Android/SuperpoweredPlayer
 
-- The source code for the Superpowered Spatializer and Global Reverb plugins for Unity.
-- Shows how to use Superpowered in the Unity Native Audio Plugin SDK.
+Shows how to use a player (for local, progressive download or HLS playback).
 
-#### /SuperpoweredSpatializer/Android/jni (Unity, Android)
-Builds the spatializer plugins for Unity->Android.
+#### /Examples_Android/SuperpoweredRecorder
 
-#### /SuperpoweredSpatializer/Xcode (Unity, OSX)
-Builds the spatializer plugins for Unity->OSX.
+Shows how to record the microphone input using SuperpoweredRecorder.
 
 #### /SuperpoweredSpatializer/ambi (OSX)
 Simple ambisonics implementation based on the SuperpoweredSpatializer.
@@ -214,7 +182,7 @@ Superpowered USB Audio classes for Android are compatible from Android 19 (KitKa
 
 # Android Studio
 
-Before running any Android example project, please set up the appropriate Android SDK and NDK paths in File - Project Structure...
+Before running any Android example project, please set up the appropriate Android SDK and NDK paths in File - Project Structure... Furthermore, turn off Instant Run in the settings, because the Instant Run feature of Android Studio is not compatible with native C++ Android projects.
 
 
 # How to create a Superpowered project with Android Studio
@@ -222,28 +190,18 @@ Before running any Android example project, please set up the appropriate Androi
 Prerequisites: latest Android SDK, Android NDK, Android Studio installed. Steps:
 
 1. Create a new project in Android Studio.
-2. Create the jni folder inside the project&#39;s folder: app/src/main/jni
-3. Copy the contents of the following files from one of the example projects: gradle/wrapper/gradle-wrapper.properties, build.gradle, app/build.gradle, app/src/main/jni/CMakeLists.txt
+2. Create the cpp folder inside the project&#39;s folder: app/src/main/jni
+3. Copy the contents of the following files from one of the example projects: gradle/wrapper/gradle-wrapper.properties, build.gradle, app/build.gradle, app/CMakeLists.txt
 4. Open build.gradle (Module: app), and change the applicationId
-
-
-# The Latest Version
-
-Details of the latest version can be found at http://superpowered.com/superpowered-audio-sdk/
-
-
-# Licensing
-
-The Superpowered Audio SDK offers free and paid licenses. Most apps qualify for a free license. 
-
-For details, please see: http://superpowered.com/license
-
-For licensing inquiries, please email licensing@superpowered.com.
 
 
 # Support
 
 Superpowered offers multiple support options.
+
+Developer Documentation (C++): https://superpowered.com/docs/
+
+Developer Documentation (Javascript): https://superpowered.com/js-wasm-sdk/docs.html
 
 Email: support@superpowered.zendesk.com
 
@@ -253,16 +211,21 @@ StackOverflow: https://stackoverflow.com/search?tab=newest&q=superpowered
 
 YouTube: https://www.youtube.com/playlist?list=PLtRKsB6a4xFMXJrZ9wjscOow3nASBoEbU
 
-Developer Documentation: http://superpowered.com/docs/index.html
+Paid support options: https://superpowered.com/support
 
-Paid support options: http://superpowered.com/support
+
+# Licensing
+
+For details, please see: https://superpowered.com/licensing
+
+For licensing inquiries, please email licensing@superpowered.com.
 
 
 # Custom Application Development Services
 
-Superpowered offers custom development services focusing on low-latency, interactive audio applications for mobile, desktop and embedded. 
+Superpowered offers custom development services focusing on low-latency, interactive audio applications for mobile, web, desktop and embedded.
 
-For development inquiries, please email customdev@superpowered.com.
+For development inquiries, please email hello@superpowered.com.
 
 
 # Contact
@@ -277,3 +240,5 @@ For licensing inquiries, please email licensing@superpowered.com.
 Superpowered FFT benefits from ideas in Construction of a High-Performance FFT by Eric Postpischil (http://edp.org/resume.htm).
 
 The Superpowered MP3 and AAC decoder benefits from optimizations by Ken Cooke.
+
+Superpowered version 2.0.0

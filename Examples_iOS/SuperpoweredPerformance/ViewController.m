@@ -1,6 +1,6 @@
 #import "ViewController.h"
 #import "CoreAudio.h"
-#import "Superpowered.h"
+#import "SuperpoweredClass.h"
 #import <QuartzCore/QuartzCore.h>
 #import <AudioToolbox/AudioToolbox.h>
 #import <AVFoundation/AVFoundation.h>
@@ -13,7 +13,7 @@
     UISlider *seekSlider;
     UIColor *disabledColor, *enabledColor, *enabledBackgroundColor;
     CoreAudio *coreAudio;
-    Superpowered *superpowered;
+    SuperpoweredAudio *superpowered;
     bool SuperpoweredEnabled, fxEnabled[NUMFXUNITS], canCompare;
     uint64_t *superpoweredAvgUnits, *superpoweredMaxUnits, *coreaudioAvgUnits, *coreaudioMaxUnits;
     int frame, config;
@@ -39,6 +39,9 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
+#ifdef __IPHONE_13_0
+    if (@available(iOS 13, *)) self.overrideUserInterfaceStyle = UIUserInterfaceStyleLight;
+#endif
     cpuLoad.text = nil;
     
     canCompare = true;
@@ -64,7 +67,7 @@
     ticksToCPUPercent = ticksToSeconds * 100.0;
     
     // Let's create two objects here, one to handle Superpowered, and the other to handle Core Audio.
-    superpowered = [[Superpowered alloc] init];
+    superpowered = [[SuperpoweredAudio alloc] init];
     coreAudio = [[CoreAudio alloc] init];
     
     SuperpoweredEnabled = true;
