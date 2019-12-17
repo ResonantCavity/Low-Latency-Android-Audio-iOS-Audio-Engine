@@ -5,7 +5,7 @@ import UIKit
 // https://developer.apple.com/library/content/documentation/Swift/Conceptual/BuildingCocoaApps/MixandMatch.html
 
 class ViewController: UIViewController {
-    var superpowered:Superpowered!
+    var superpowered:SuperpoweredBridge!
     var displayLink:CADisplayLink!
     var layers:[CALayer]!
 
@@ -21,12 +21,12 @@ class ViewController: UIViewController {
             self.view.layer.addSublayer(layers[n])
         }
 
-        superpowered = Superpowered()
+        superpowered = SuperpoweredBridge()
 
         // A display link calls us on every frame (60 fps).
         displayLink = CADisplayLink(target: self, selector: #selector(ViewController.onDisplayLink))
         displayLink.frameInterval = 1
-        displayLink.add(to: RunLoop.current, forMode: RunLoopMode.commonModes)
+        displayLink.add(to: RunLoop.current, forMode: RunLoop.Mode.common)
     }
 
     @objc func onDisplayLink() {
@@ -51,7 +51,7 @@ class ViewController: UIViewController {
         }
 
         CATransaction.commit()
-        frequencies.deallocate(capacity: 8)
+        frequencies.deallocate()
     }
 }
 
