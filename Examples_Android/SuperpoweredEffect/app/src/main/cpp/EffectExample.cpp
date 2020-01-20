@@ -1,47 +1,42 @@
 #include <jni.h>
 #include <string>
-#include <OpenSource/SuperpoweredAndroidAudioIO.h>
-#include <Superpowered.h>
+#include <AndroidIO/SuperpoweredAndroidAudioIO.h>
 #include <SuperpoweredReverb.h>
 #include <SuperpoweredSimple.h>
 #include <malloc.h>
 
 static SuperpoweredAndroidAudioIO *audioIO;
-static Superpowered::Reverb *reverb;
+static SuperpoweredReverb *reverb;
+static float *floatBuffer;
 
 // This is called periodically by the audio engine.
 static bool audioProcessing (
         void * __unused clientdata, // custom pointer
-        short int *audio,           // output buffer
+        short int *audio,           // buffer of interleaved samples
         int numberOfFrames,         // number of frames to process
-        int samplerate              // current sample rate in Hz
+        int __unused samplerate     // sampling rate
 ) {
-    reverb->samplerate = (unsigned int)samplerate;
-    float floatBuffer[numberOfFrames * 2];
-
-    Superpowered::ShortIntToFloat(audio, floatBuffer, (unsigned int)numberOfFrames);
+    SuperpoweredShortIntToFloat(audio, floatBuffer, (unsigned int)numberOfFrames);
     reverb->process(floatBuffer, floatBuffer, (unsigned int)numberOfFrames);
-    Superpowered::FloatToShortInt(floatBuffer, audio, (unsigned int)numberOfFrames);
+    SuperpoweredFloatToShortInt(floatBuffer, audio, (unsigned int)numberOfFrames);
+    //memset(audio, 0, numberOfFrames * 4);
     return true;
 }
 
 // StartAudio - Start audio engine.
 extern "C" JNIEXPORT void
-Java_com_superpowered_effect_MainActivity_StartAudio(JNIEnv * __unused env, jobject  __unused obj, jint samplerate, jint buffersize) {
-    Superpowered::Initialize(
-            "ExampleLicenseKey-WillExpire-OnNextUpdate",
-            false, // enableAudioAnalysis (using SuperpoweredAnalyzer, SuperpoweredLiveAnalyzer, SuperpoweredWaveform or SuperpoweredBandpassFilterbank)
-            false, // enableFFTAndFrequencyDomain (using SuperpoweredFrequencyDomain, SuperpoweredFFTComplex, SuperpoweredFFTReal or SuperpoweredPolarFFT)
-            false, // enableAudioTimeStretching (using SuperpoweredTimeStretching)
-            true,  // enableAudioEffects (using any SuperpoweredFX class)
-            false, // enableAudioPlayerAndDecoder (using SuperpoweredAdvancedAudioPlayer or SuperpoweredDecoder)
-            false, // enableCryptographics (using Superpowered::RSAPublicKey, Superpowered::RSAPrivateKey, Superpowered::hasher or Superpowered::AES)
-            false  // enableNetworking (using Superpowered::httpRequest)
-    );
+Java_com_superpowered_effect_MainActivity_StartAudio (
+        JNIEnv * __unused env,
+        jobject  __unused obj,
+        jint samplerate,
+        jint buffersize
+) {
+    // allocate audio buffer
+    floatBuffer = (float *)malloc(sizeof(float) * 2 * buffersize);
 
     // initialize reverb
-    reverb = new Superpowered::Reverb((unsigned int)samplerate);
-    reverb->enabled = true;
+    reverb = new SuperpoweredReverb((unsigned int)samplerate);
+    reverb->enable(true);
 
     // init audio with audio callback function
     audioIO = new SuperpoweredAndroidAudioIO (
@@ -58,19 +53,29 @@ Java_com_superpowered_effect_MainActivity_StartAudio(JNIEnv * __unused env, jobj
 
 // StopAudio - Stop audio engine and free resources.
 extern "C" JNIEXPORT void
-Java_com_superpowered_effect_MainActivity_StopAudio(JNIEnv * __unused env, jobject __unused obj) {
+Java_com_superpowered_effect_MainActivity_StopAudio (
+        JNIEnv * __unused env,
+        jobject __unused obj
+) {
     delete audioIO;
     delete reverb;
+    free(floatBuffer);
 }
 
-// onBackground - Put audio processing to sleep if no audio is playing.
+// onBackground - Put audio processing to sleep.
 extern "C" JNIEXPORT void
-Java_com_superpowered_effect_MainActivity_onBackground(JNIEnv * __unused env, jobject __unused obj) {
+Java_com_superpowered_effect_MainActivity_onBackground (
+        JNIEnv * __unused env,
+        jobject __unused obj
+) {
     audioIO->onBackground();
 }
 
 // onForeground - Resume audio processing.
 extern "C" JNIEXPORT void
-Java_com_superpowered_effect_MainActivity_onForeground(JNIEnv * __unused env, jobject __unused obj) {
+Java_com_superpowered_effect_MainActivity_onForeground (
+        JNIEnv * __unused env,
+        jobject __unused obj
+) {
     audioIO->onForeground();
 }

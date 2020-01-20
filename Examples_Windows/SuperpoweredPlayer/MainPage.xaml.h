@@ -17,7 +17,5 @@ namespace SuperpoweredPlayer
 	public:
 		MainPage();
 		void Toggle(Platform::Object^ sender, Windows::UI::Xaml::RoutedEventArgs^ e);
-	private:
-		void OnTick(Platform::Object^ sender, Platform::Object^ e);
 	};
 }

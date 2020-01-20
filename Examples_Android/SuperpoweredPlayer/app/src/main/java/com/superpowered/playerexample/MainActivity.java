@@ -1,14 +1,14 @@
 package com.superpowered.playerexample;
 
-import androidx.appcompat.app.AppCompatActivity;
+import android.support.v7.app.AppCompatActivity;
 import android.content.res.AssetFileDescriptor;
 import android.media.AudioManager;
 import android.content.Context;
 import android.widget.Button;
 import android.view.View;
 import android.util.Log;
+import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
 import java.io.IOException;
 
 public class MainActivity extends AppCompatActivity {
@@ -20,10 +20,12 @@ public class MainActivity extends AppCompatActivity {
         // Get the device's sample rate and buffer size to enable
         // low-latency Android audio output, if available.
         String samplerateString = null, buffersizeString = null;
-        AudioManager audioManager = (AudioManager) this.getSystemService(Context.AUDIO_SERVICE);
-        if (audioManager != null) {
-            samplerateString = audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE);
-            buffersizeString = audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER);
+        if (Build.VERSION.SDK_INT >= 17) {
+            AudioManager audioManager = (AudioManager) this.getSystemService(Context.AUDIO_SERVICE);
+            if (audioManager != null) {
+                samplerateString = audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE);
+                buffersizeString = audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER);
+            }
         }
         if (samplerateString == null) samplerateString = "48000";
         if (buffersizeString == null) buffersizeString = "480";
@@ -42,34 +44,17 @@ public class MainActivity extends AppCompatActivity {
         }
         String path = getPackageResourcePath();         // get path to APK package
         System.loadLibrary("PlayerExample");    // load native library
-        NativeInit(samplerate, buffersize, getCacheDir().getAbsolutePath()); // start audio engine
-        OpenFileFromAPK(path, fileOffset, fileLength);  // open audio file from APK
+        StartAudio(samplerate, buffersize);             // start audio engine
+        OpenFile(path, fileOffset, fileLength);         // open audio file from APK
         // If the application crashes, please disable Instant Run under Build, Execution, Deployment in preferences.
-
-        // Update UI every 40 ms until UI_update returns with false.
-        Runnable runnable = new Runnable() {
-            @Override
-            public void run() {
-                UI_update();
-                handler.postDelayed(this, 40);
-            }
-        };
-        handler = new Handler();
-        handler.postDelayed(runnable, 40);
     }
 
-    public void UI_update() {
-        boolean p = onUserInterfaceUpdate();
-        if (playing != p) {
-            playing = p;
-            Button b = findViewById(R.id.playPause);
-            b.setText(playing ? "Pause" : "Play");
-        }
-    }
-
-    // Play/Pause button event.
-    public void PlayerExample_PlayPause(View button) {
+    // Handle Play/Pause button toggle.
+    public void PlayerExample_PlayPause (View button) {
         TogglePlayback();
+        playing = !playing;
+        Button b = findViewById(R.id.playPause);
+        b.setText(playing ? "Pause" : "Play");
     }
 
     @Override
@@ -90,14 +75,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // Functions implemented in the native library.
-    private native void NativeInit(int samplerate, int buffersize, String tempPath);
-    private native void OpenFileFromAPK(String path, int offset, int length);
-    private native boolean onUserInterfaceUpdate();
+    private native void StartAudio(int samplerate, int buffersize);
+    private native void OpenFile(String path, int offset, int length);
     private native void TogglePlayback();
     private native void onForeground();
     private native void onBackground();
     private native void Cleanup();
 
     private boolean playing = false;
-    private Handler handler;
 }

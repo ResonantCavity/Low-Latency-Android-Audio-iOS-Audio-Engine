@@ -1,16 +1,15 @@
 #include <jni.h>
-#include <Superpowered.h>
+#include <stdlib.h>
+#include <string.h>
 #include <SuperpoweredFrequencyDomain.h>
-#include <OpenSource/SuperpoweredAndroidAudioIO.h>
+#include <AndroidIO/SuperpoweredAndroidAudioIO.h>
 #include <SuperpoweredSimple.h>
 #include <SuperpoweredCPU.h>
 #include <SLES/OpenSLES.h>
 #include <SLES/OpenSLES_AndroidConfiguration.h>
-#include <string.h>
-#include <stdlib.h>
 
 static SuperpoweredAndroidAudioIO *audioIO;
-static Superpowered::FrequencyDomain *frequencyDomain;
+static SuperpoweredFrequencyDomain *frequencyDomain;
 static float *magnitudeLeft, *magnitudeRight, *phaseLeft, *phaseRight, *fifoOutput, *inputBufferFloat;
 static int fifoOutputFirstSample, fifoOutputLastSample, stepSize, fifoCapacity;
 
@@ -18,13 +17,13 @@ static int fifoOutputFirstSample, fifoOutputLastSample, stepSize, fifoCapacity;
 
 // This is called periodically by the audio engine.
 static bool audioProcessing (
-        void * __unused clientdata,  // A custom pointer your callback receives.
-        short int *audioInputOutput, // 16-bit stereo interleaved audio input and/or output.
-        int numberOfFrames,          // The number of frames received and/or requested.
-        int __unused samplerate      // The current sample rate in Hz.
+        void * __unused clientdata,     // A custom pointer your callback receives.
+        short int *audioInputOutput,    // 16-bit stereo interleaved audio input and/or output.
+        int numberOfFrames,             // The number of frames received and/or requested.
+        int __unused samplerate         // The current sampling rate in Hz.
 ) {
     // Convert 16-bit integer samples to 32-bit floating point.
-    Superpowered::ShortIntToFloat(audioInputOutput, inputBufferFloat, (unsigned int)numberOfFrames);
+    SuperpoweredShortIntToFloat(audioInputOutput, inputBufferFloat, (unsigned int)numberOfFrames);
 
     // Input goes to the frequency domain.
     frequencyDomain->addInput(inputBufferFloat, numberOfFrames);
@@ -54,14 +53,15 @@ static bool audioProcessing (
         };
 
         // Transforming back to the time domain.
-        frequencyDomain->frequencyDomainToTimeDomain(magnitudeLeft, magnitudeRight, phaseLeft, phaseRight, fifoOutput + fifoOutputLastSample * 2);
+        frequencyDomain->frequencyDomainToTimeDomain(magnitudeLeft, magnitudeRight, phaseLeft, phaseRight,
+                                                     fifoOutput + fifoOutputLastSample * 2);
         frequencyDomain->advance();
         fifoOutputLastSample += stepSize;
     };
 
     // If we have enough samples in the fifo output buffer, pass them to the audio output.
     if (fifoOutputLastSample - fifoOutputFirstSample >= numberOfFrames) {
-        Superpowered::FloatToShortInt(fifoOutput + fifoOutputFirstSample * 2,
+        SuperpoweredFloatToShortInt(fifoOutput + fifoOutputFirstSample * 2,
                                     audioInputOutput, (unsigned int)numberOfFrames);
         fifoOutputFirstSample += numberOfFrames;
         return true;
@@ -72,28 +72,21 @@ static bool audioProcessing (
 
 // FrequencyDomain - Initialize buffers and setup frequency domain processing.
 extern "C" JNIEXPORT void
-Java_com_superpowered_frequencydomain_MainActivity_FrequencyDomain(JNIEnv * __unused env, jobject __unused obj, jint samplerate, jint buffersize) {
-    Superpowered::Initialize(
-            "ExampleLicenseKey-WillExpire-OnNextUpdate",
-            false, // enableAudioAnalysis (using SuperpoweredAnalyzer, SuperpoweredLiveAnalyzer, SuperpoweredWaveform or SuperpoweredBandpassFilterbank)
-            true, // enableFFTAndFrequencyDomain (using SuperpoweredFrequencyDomain, SuperpoweredFFTComplex, SuperpoweredFFTReal or SuperpoweredPolarFFT)
-            false, // enableAudioTimeStretching (using SuperpoweredTimeStretching)
-            false, // enableAudioEffects (using any SuperpoweredFX class)
-            false, // enableAudioPlayerAndDecoder (using SuperpoweredAdvancedAudioPlayer or SuperpoweredDecoder)
-            false, // enableCryptographics (using Superpowered::RSAPublicKey, Superpowered::RSAPrivateKey, Superpowered::hasher or Superpowered::AES)
-            false  // enableNetworking (using Superpowered::httpRequest)
-    );
-
+Java_com_superpowered_frequencydomain_MainActivity_FrequencyDomain (
+        JNIEnv * __unused env,
+        jobject __unused obj,
+        jint samplerate,        // sampling rate
+        jint buffersize         // buffer size
+) {
     // This will do the main "magic".
-    frequencyDomain = new Superpowered::FrequencyDomain(FFT_LOG_SIZE);
-    int fftSize = 1 << FFT_LOG_SIZE;
+    frequencyDomain = new SuperpoweredFrequencyDomain(FFT_LOG_SIZE);
 
     // The default overlap ratio is 4:1, so we will receive 1/4 of the
     // samples from the frequency domain in one step.
-    stepSize = fftSize / 4;
+    stepSize = frequencyDomain->fftSize / 4;
 
     // Frequency domain data goes into these buffers.
-    size_t fftBufferSize = fftSize * sizeof(float);
+    size_t fftBufferSize = frequencyDomain->fftSize * sizeof(float);
     magnitudeLeft  = (float *)malloc(fftBufferSize);
     magnitudeRight = (float *)malloc(fftBufferSize);
     phaseLeft      = (float *)malloc(fftBufferSize);
@@ -108,24 +101,27 @@ Java_com_superpowered_frequencydomain_MainActivity_FrequencyDomain(JNIEnv * __un
     inputBufferFloat = (float *)malloc(buffersize   * sizeof(float) * 2);
 
     // Prevent audio dropouts.
-    Superpowered::CPU::setSustainedPerformanceMode(true);
+    SuperpoweredCPU::setSustainedPerformanceMode(true);
 
     // Start audio engine and processing.
     audioIO = new SuperpoweredAndroidAudioIO (
-            samplerate,             // native sampe rate
-            buffersize,             // native buffer size
-            true,                   // enableInput
-            true,                   // enableOutput
-            audioProcessing,        // process callback function
-            NULL,                   // clientData
-            -1,                     // inputStreamType (-1 = default)
-            SL_ANDROID_STREAM_MEDIA // outputStreamType (-1 = default)
+            samplerate,                 // sampling rate
+            buffersize,                 // buffer size
+            true,                       // enableInput
+            true,                       // enableOutput
+            audioProcessing,            // process callback function
+            NULL,                       // clientData
+            -1,                         // inputStreamType (-1 = default)
+            SL_ANDROID_STREAM_MEDIA     // outputStreamType (-1 = default)
     );
 }
 
 // Cleanup - Stop audio processing and free resources.
 extern "C" JNIEXPORT void
-Java_com_superpowered_frequencydomain_MainActivity_Cleanup(JNIEnv * __unused env, jobject __unused obj) {
+Java_com_superpowered_frequencydomain_MainActivity_Cleanup (
+        JNIEnv * __unused env,
+        jobject __unused obj
+) {
     delete audioIO;
     free(magnitudeLeft);
     free(magnitudeRight);

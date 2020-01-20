@@ -1,6 +1,6 @@
 #import "ViewController.h"
 #import "CoreAudio.h"
-#import "SuperpoweredClass.h"
+#import "Superpowered.h"
 #import <QuartzCore/QuartzCore.h>
 #import <AudioToolbox/AudioToolbox.h>
 #import <AVFoundation/AVFoundation.h>
@@ -39,9 +39,6 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-#ifdef __IPHONE_13_0
-    if (@available(iOS 13, *)) self.overrideUserInterfaceStyle = UIUserInterfaceStyleLight;
-#endif
     cpuLoad.text = nil;
     
     canCompare = true;

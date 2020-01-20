@@ -9,7 +9,7 @@
 
     <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
         <TextBlock HorizontalAlignment="Left" Text="TextBlock" TextWrapping="Wrap" VerticalAlignment="Top"/>
-        <Button Content="Start" Click="Toggle" HorizontalAlignment="Center" Name="MyButton" />
+        <Button Content="Start" Click="Toggle" HorizontalAlignment="Center" />
         
     </Grid>
 </Page>

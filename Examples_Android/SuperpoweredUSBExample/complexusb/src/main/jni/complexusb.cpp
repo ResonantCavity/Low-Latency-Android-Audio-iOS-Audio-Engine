@@ -1,35 +1,31 @@
 #include <jni.h>
 #include <malloc.h>
 #include <math.h>
-#include <SuperpoweredAndroidUSB.h>
-#include <Superpowered.h>
+#include <AndroidIO/SuperpoweredUSBAudio.h>
 #include <SuperpoweredCPU.h>
 #include "latencyMeasurer.h"
 
-// Called when the application is initialized. You can initialize Superpowered::AndroidUSB
-// at any time. Although this function is marked __unused, it's due Android Studio's
+// Called when the application is initialized. You can initialize SuperpoweredUSBSystem
+// at any time btw. Although this function is marked __unused, it's due Android Studio's
 // annoying warning only. It's definitely used.
-__unused jint JNI_OnLoad (JavaVM * __unused vm, void * __unused reserved) {
-    Superpowered::Initialize(
-            "ExampleLicenseKey-WillExpire-OnNextUpdate",
-            false, // enableAudioAnalysis (using SuperpoweredAnalyzer, SuperpoweredLiveAnalyzer, SuperpoweredWaveform or SuperpoweredBandpassFilterbank)
-            false, // enableFFTAndFrequencyDomain (using SuperpoweredFrequencyDomain, SuperpoweredFFTComplex, SuperpoweredFFTReal or SuperpoweredPolarFFT)
-            false, // enableAudioTimeStretching (using SuperpoweredTimeStretching)
-            false, // enableAudioEffects (using any SuperpoweredFX class)
-            false, // enableAudioPlayerAndDecoder (using SuperpoweredAdvancedAudioPlayer or SuperpoweredDecoder)
-            false, // enableCryptographics (using Superpowered::RSAPublicKey, Superpowered::RSAPrivateKey, Superpowered::hasher or Superpowered::AES)
-            false  // enableNetworking (using Superpowered::httpRequest)
-    );
-    Superpowered::AndroidUSB::initialize(NULL, NULL, NULL, NULL, NULL);
+__unused jint JNI_OnLoad (
+        JavaVM * __unused vm,
+        void * __unused reserved
+) {
+    SuperpoweredUSBSystem::initialize(NULL, NULL, NULL, NULL, NULL);
     return JNI_VERSION_1_6;
 }
 
-// Called when the application is closed. You can destroy SuperpoweredUSBSystem at any time.
-// Although this function is marked __unused, it's due Android Studio's annoying warning only.
-// It's definitely used.
-__unused void JNI_OnUnload (JavaVM * __unused vm, void * __unused reserved) {
-    Superpowered::AndroidUSB::destroy();
+// Called when the application is closed. You can destroy SuperpoweredUSBSystem at any
+// time btw. Although this function is marked __unused, it's due Android Studio's annoying
+// warning only. It's definitely used.
+__unused void JNI_OnUnload (
+        JavaVM * __unused vm,
+        void * __unused reserved
+) {
+    SuperpoweredUSBSystem::destroy();
 }
+
 
 // Beautifying the ugly Java-C++ bridge (JNI) with these macros.
 #define PID com_superpowered_complexusb_SuperpoweredUSBAudio // Java package name and class name. Don't forget to update when you copy this code.
@@ -46,25 +42,33 @@ JNI(jint, onConnect, PID) (
 ) {
     jbyte *rd = env->GetByteArrayElements(rawDescriptor, NULL);
     int dataBytes = env->GetArrayLength(rawDescriptor);
-    int r = Superpowered::AndroidUSB::onConnect(deviceID, fd, (unsigned char *)rd, dataBytes);
+    int r = SuperpoweredUSBSystem::onConnect(deviceID, fd, (unsigned char *)rd, dataBytes);
     env->ReleaseByteArrayElements(rawDescriptor, rd, JNI_ABORT);
     return r;
 }
 
 // This is called by the SuperpoweredUSBAudio Java object when a USB device is disconnected.
-JNI(void, onDisconnect, PID) (JNIEnv * __unused env, jobject __unused obj, jint deviceID) {
-    Superpowered::AndroidUSB::onDisconnect(deviceID);
+JNI(void, onDisconnect, PID) (
+        JNIEnv * __unused env,
+        jobject __unused obj,
+        jint deviceID          // USB device identifier.
+) {
+    SuperpoweredUSBSystem::onDisconnect(deviceID);
 }
 
 #undef PID
 #define PID com_superpowered_complexusb_MainActivity // Java package name and class name. Don't forget to update when you copy this code.
 
 // Returns with a string array: { manufacturer, product, info }
-JNI(jobjectArray, getUSBAudioDeviceInfo, PID) (JNIEnv *env, jobject __unused obj, jint deviceID) {
+JNI(jobjectArray, getUSBAudioDeviceInfo, PID) (
+        JNIEnv *env,
+        jobject __unused obj,
+        jint deviceID
+) {
     jobjectArray names = env->NewObjectArray(3, env->FindClass("java/lang/String"), NULL);
     const char *manufacurer, *product, *info;
     // Get information about the device.
-    Superpowered::AndroidUSBAudio::getInfo (
+    SuperpoweredUSBAudio::getInfo (
             deviceID,      // Device identifier.
             &manufacurer,  // Manufacturer name.
             &product,      // Product name.
@@ -84,9 +88,13 @@ JNI(jobjectArray, getUSBAudioDeviceInfo, PID) (JNIEnv *env, jobject __unused obj
 
 // A USB audio device may have multiple configurations. This returns with their names
 // in order of their indexes (eg. 0, 1, 2, ...).
-JNI(jobjectArray, getConfigurationInfo, PID) (JNIEnv *env, jobject __unused obj, jint deviceID) {
+JNI(jobjectArray, getConfigurationInfo, PID) (
+        JNIEnv *env,
+        jobject __unused obj,
+        jint deviceID
+) {
     int numConfigurations; char **configurationNames;
-    Superpowered::AndroidUSBAudio::getConfigurationInfo(
+    SuperpoweredUSBAudio::getConfigurationInfo(
             deviceID,               // Device identifier.
             &numConfigurations,     // Number of configurations.
             &configurationNames     // Names of each configuration.
@@ -104,15 +112,24 @@ JNI(jobjectArray, getConfigurationInfo, PID) (JNIEnv *env, jobject __unused obj,
 }
 
 // Set the configuration of the USB audio device.
-JNI(void, setConfiguration, PID) (JNIEnv * __unused env, jobject __unused obj, jint deviceID, jint configurationIndex) {
-    Superpowered::AndroidUSBAudio::setConfiguration(deviceID, configurationIndex);
+JNI(void, setConfiguration, PID) (
+        JNIEnv * __unused env,
+        jobject __unused obj,
+        jint deviceID,
+        jint configurationIndex
+) {
+    SuperpoweredUSBAudio::setConfiguration(deviceID, configurationIndex);
 }
 
 // Get the names of the available inputs. An input has a unique bit depth, channel count
 // and sample rate combination.
-JNI(jobjectArray, getInputs, PID) (JNIEnv *env, jobject __unused obj, jint deviceID) {
-    Superpowered::AndroidUSBAudioIOInfo *infos;
-    int num = Superpowered::AndroidUSBAudio::getInputs(deviceID, &infos);
+JNI(jobjectArray, getInputs, PID) (
+        JNIEnv *env,
+        jobject __unused obj,
+        jint deviceID
+) {
+    SuperpoweredUSBAudioIOInfo *infos;
+    int num = SuperpoweredUSBAudio::getInputs(deviceID, &infos);
     jobjectArray names = env->NewObjectArray(num, env->FindClass("java/lang/String"), NULL);
     for (int n = 0; n < num; n++)
         env->SetObjectArrayElement(names, n, env->NewStringUTF(infos[n].name));
@@ -122,9 +139,13 @@ JNI(jobjectArray, getInputs, PID) (JNIEnv *env, jobject __unused obj, jint devic
 
 // Get the names of the available outputs. An output has a unique bit depth, channel count
 // and sample rate combination.
-JNI(jobjectArray, getOutputs, PID) (JNIEnv *env, jobject __unused obj, jint deviceID) {
-    Superpowered::AndroidUSBAudioIOInfo *infos;
-    int num = Superpowered::AndroidUSBAudio::getOutputs(deviceID, &infos);
+JNI(jobjectArray, getOutputs, PID) (
+        JNIEnv *env,
+        jobject __unused obj,
+        jint deviceID
+) {
+    SuperpoweredUSBAudioIOInfo *infos;
+    int num = SuperpoweredUSBAudio::getOutputs(deviceID, &infos);
     jobjectArray names = env->NewObjectArray(num, env->FindClass("java/lang/String"), NULL);
     for (int n = 0; n < num; n++)
         env->SetObjectArrayElement(names, n, env->NewStringUTF(infos[n].name));
@@ -139,11 +160,17 @@ static int nums[3];
 static char **pathNames[3];
 
 // Check MainActivity.java how to handle this.
-JNI(void, getIOOptions, PID) (JNIEnv * __unused env, jobject __unused obj, jint deviceID, jint inputIOIndex, jint outputIOIndex) {
+JNI(void, getIOOptions, PID) (
+        JNIEnv * __unused env,
+        jobject __unused obj,
+        jint deviceID,
+        jint inputIOIndex,
+        jint outputIOIndex
+) {
     nums[0] = nums[1] = nums[2] = 0;
 
     if (outputIOIndex >= 0) {
-        Superpowered::AndroidUSBAudio::getIOOptions(
+        SuperpoweredUSBAudio::getIOOptions(
                 deviceID,        // Device identifier.
                 false,           // True for input, false for output.
                 outputIOIndex,   // The index of the input or output.
@@ -156,7 +183,7 @@ JNI(void, getIOOptions, PID) (JNIEnv * __unused env, jobject __unused obj, jint 
         );
     }
     if (inputIOIndex >= 0) {
-        Superpowered::AndroidUSBAudio::getIOOptions(
+        SuperpoweredUSBAudio::getIOOptions(
                 deviceID,        // Device identifier.
                 true,            // True for input, false for output.
                 inputIOIndex,    // The index of the input or output.
@@ -171,7 +198,11 @@ JNI(void, getIOOptions, PID) (JNIEnv * __unused env, jobject __unused obj, jint 
 }
 
 // Check MainActivity.java how to handle this.
-JNI(jintArray, getIOOptionsInt, PID) (JNIEnv *env, jobject __unused obj, jint outputInputThru) {
+JNI(jintArray, getIOOptionsInt, PID) (
+        JNIEnv *env,
+        jobject __unused obj,
+        jint outputInputThru
+) {
     jintArray ints = env->NewIntArray(nums[outputInputThru]);
     jint *i = env->GetIntArrayElements(ints, 0);
     for (int n = 0; n < nums[outputInputThru]; n++) i[n] = paths[outputInputThru][n];
@@ -180,7 +211,11 @@ JNI(jintArray, getIOOptionsInt, PID) (JNIEnv *env, jobject __unused obj, jint ou
 }
 
 // Check MainActivity.java how to handle this.
-JNI(jobjectArray, getIOOptionsString, PID) (JNIEnv *env, jobject __unused obj, jint outputInputThru) {
+JNI(jobjectArray, getIOOptionsString, PID) (
+        JNIEnv *env,
+        jobject __unused obj,
+        jint outputInputThru
+) {
     jobjectArray names = env->NewObjectArray(
             nums[outputInputThru], env->FindClass("java/lang/String"), NULL);
     for (int n = 0; n < nums[outputInputThru]; n++)
@@ -189,7 +224,10 @@ JNI(jobjectArray, getIOOptionsString, PID) (JNIEnv *env, jobject __unused obj, j
 }
 
 // Check MainActivity.java how to handle this.
-JNI(void, getIOOptionsEnd, PID) (JNIEnv * __unused env, jobject __unused obj) {
+JNI(void, getIOOptionsEnd, PID) (
+        JNIEnv * __unused env,
+        jobject __unused obj
+) {
     for (int n = 0; n < 3; n++) if (nums[n]) {
         free(paths[n]);
         for (int i = 0; i < nums[n]; i++) free(pathNames[n][i]);
@@ -198,11 +236,16 @@ JNI(void, getIOOptionsEnd, PID) (JNIEnv * __unused env, jobject __unused obj) {
 }
 
 // Get a path's properties.
-JNI(jfloatArray, getPathInfo, PID) (JNIEnv *env, jobject __unused obj, jint deviceID, jint pathIndex) {
+JNI(jfloatArray, getPathInfo, PID) (
+        JNIEnv *env,
+        jobject __unused obj,
+        jint deviceID,
+        jint pathIndex
+) {
     int numFeatures;
     float *minVolumes, *maxVolumes, *curVolumes;
     char *mutes;
-    Superpowered::AndroidUSBAudio::getPathInfo(
+    SuperpoweredUSBAudio::getPathInfo(
             deviceID,        // Device identifier.
             pathIndex,       // Path index.
             &numFeatures,    // Returns the number of features (the size of the minVolumes, maxVolumes, curVolumes and mutes arrays).
@@ -239,7 +282,7 @@ JNI(jfloat, setVolume, PID) (
         jint channel,
         jfloat db           // volume in decibels
 ) {
-    return Superpowered::AndroidUSBAudio::setVolume(deviceID, pathIndex, channel, db);
+    return SuperpoweredUSBAudio::setVolume(deviceID, pathIndex, channel, db);
 }
 
 // Set "mute" state of device for specified path/channel.
@@ -251,7 +294,7 @@ JNI(jboolean, setMute, PID) (
         jint channel,
         jboolean mute      // "mute" state
 ) {
-    return (jboolean)Superpowered::AndroidUSBAudio::setMute(deviceID, pathIndex, channel, mute);
+    return (jboolean)SuperpoweredUSBAudio::setMute(deviceID, pathIndex, channel, mute);
 }
 
 // A helper structure for audio processing.
@@ -347,7 +390,7 @@ JNI(void, startIO, PID) (
         jint latency,
         jboolean latencyMeasurement
 ) {
-    Superpowered::AndroidUSBAudio::stopIO(lastDeviceID);
+    SuperpoweredUSBAudio::stopIO(lastDeviceID);
     latencyMs = -1;
     lastDeviceID = deviceID;
 
@@ -368,27 +411,30 @@ JNI(void, startIO, PID) (
         job->intBuf = (short int *)malloc(sizeof(short int) * 2 * 1024);
     }
 
-    Superpowered::AndroidUSBAudioBufferSize bufferSize;
+    SuperpoweredUSBAudioLatency sl;
     switch (latency) {
-        case 1: bufferSize = Superpowered::AndroidUSBAudioBufferSize_Low; break;
-        case 2: bufferSize = Superpowered::AndroidUSBAudioBufferSize_Mid; break;
-        default: bufferSize = Superpowered::AndroidUSBAudioBufferSize_VeryLow;
+        case 1: sl = SuperpoweredUSBLatency_Mid; break;
+        case 2: sl = SuperpoweredUSBLatency_High; break;
+        default: sl = SuperpoweredUSBLatency_Low;
     }
-    Superpowered::CPU::setSustainedPerformanceMode(true);
-    Superpowered::AndroidUSBAudio::startIO (
+    SuperpoweredCPU::setSustainedPerformanceMode(true);
+    SuperpoweredUSBAudio::startIO (
             deviceID,          // deviceID
             inputIOIndex,      // inputIOIndex
             outputIOIndex,     // outputIOIndex
-            bufferSize,                // latency
+            sl,                // latency
             job,               // clientData
             audioProcessing    // audio process callback
     );
 }
 
 // Stop audio processing.
-JNI(void, stopIO, PID) (JNIEnv * __unused env, jobject __unused obj) {
-    Superpowered::AndroidUSBAudio::stopIO(lastDeviceID);
-    Superpowered::CPU::setSustainedPerformanceMode(false);
+JNI(void, stopIO, PID) (
+        JNIEnv * __unused env,
+        jobject __unused obj
+) {
+    SuperpoweredUSBAudio::stopIO(lastDeviceID);
+    SuperpoweredCPU::setSustainedPerformanceMode(false);
     latencyMs = -1;
 }
 
