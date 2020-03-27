@@ -343,7 +343,7 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
     };
 #ifdef ALLOW_BLUETOOTH
     if (multiRoute) [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryMultiRoute error:NULL];
-    else [[AVAudioSession sharedInstance] setCategory:audioSessionCategory withOptions:AVAudioSessionCategoryOptionAllowBluetoothA2DP | AVAudioSessionCategoryOptionMixWithOthers error:NULL];
+    else [[AVAudioSession sharedInstance] setCategory:audioSessionCategory withOptions:AVAudioSessionCategoryOptionAllowBluetoothA2DP error:NULL];
 #else
     [[AVAudioSession sharedInstance] setCategory:multiRoute ? AVAudioSessionCategoryMultiRoute : audioSessionCategory error:NULL];
 #endif
