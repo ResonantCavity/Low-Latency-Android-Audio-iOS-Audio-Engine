@@ -241,6 +241,12 @@ void SuperpoweredAndroidAudioIO::stop() {
     stopQueues(internals);
 }
 
+void SuperpoweredAndroidAudioIO::resetInputBufferIndices() {
+    if(internals->inputFifo.readIndex != internals->inputFifo.writeIndex){
+        internals->inputFifo.readIndex = internals->inputFifo.writeIndex;
+    }
+}
+
 SuperpoweredAndroidAudioIO::~SuperpoweredAndroidAudioIO() {
     stopQueues(internals);
     usleep(200000);

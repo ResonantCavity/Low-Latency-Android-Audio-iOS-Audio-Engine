@@ -56,6 +56,11 @@ public:
 */
     void stop();
 
+/*
+@brief resets the read/write indices of the input FIFO buffer to present accumulating latency
+ */
+
+    void resetInputBufferIndices();
 private:
     SuperpoweredAndroidAudioIOInternals *internals;
     SuperpoweredAndroidAudioIO(const SuperpoweredAndroidAudioIO&);
