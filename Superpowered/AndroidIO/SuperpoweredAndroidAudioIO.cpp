@@ -10,6 +10,8 @@
 #include <dlfcn.h>
 #include <android/log.h>
 
+#define USE_AAUDIO 1
+
 #define AAUDIO_CALLBACK_RESULT_CONTINUE  0
 #define AAUDIO_OK 0
 #define AAUDIO_STREAM_STATE_DISCONNECTED 13
@@ -66,6 +68,9 @@ static bool aaudioInitialized = false;
 static bool aaudioAvailable = false;
 
 static bool initializeAAudio() {
+    #if (USE_AAUDIO == 0)
+    return false;
+    #endif
     if (aaudioInitialized) return aaudioAvailable;
     aaudioInitialized = true;
 
@@ -108,9 +113,9 @@ if (func == NULL) { dlclose(aaudioLib); __android_log_print(ANDROID_LOG_VERBOSE,
 #define NUM_CHANNELS 2
 
 #if NUM_CHANNELS == 1
-#define CHANNELMASK SL_SPEAKER_FRONT_CENTER
+    #define CHANNELMASK SL_SPEAKER_FRONT_CENTER
 #elif NUM_CHANNELS == 2
-#define CHANNELMASK (SL_SPEAKER_FRONT_LEFT | SL_SPEAKER_FRONT_RIGHT)
+    #define CHANNELMASK (SL_SPEAKER_FRONT_LEFT | SL_SPEAKER_FRONT_RIGHT)
 #endif
 
 typedef struct fifo {
@@ -415,6 +420,7 @@ static void SuperpoweredAndroidAudioIO_OutputCallback(SLAndroidSimpleBufferQueue
 
 SuperpoweredAndroidAudioIO::SuperpoweredAndroidAudioIO(int samplerate, int buffersize, bool enableInput, bool enableOutput, audioProcessingCallback callback, void *clientdata, int inputStreamType, int outputStreamType) {
     static const SLboolean requireds[2] = { SL_BOOLEAN_TRUE, SL_BOOLEAN_FALSE };
+    if (buffersize > 1024) buffersize = 1024;
 
     internals = new SuperpoweredAndroidAudioIOInternals;
     memset(internals, 0, sizeof(SuperpoweredAndroidAudioIOInternals));
@@ -440,7 +446,6 @@ SuperpoweredAndroidAudioIO::SuperpoweredAndroidAudioIO(int samplerate, int buffe
         case -1: break;
         default: internals->aaudio = false;
     }
-
 
     if (internals->aaudio) internals->aaudio = startAAudio(internals);
     if (!internals->aaudio) {
