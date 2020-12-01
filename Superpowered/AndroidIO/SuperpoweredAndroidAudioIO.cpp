@@ -222,7 +222,7 @@ static int32_t aaudioProcessingCallback(__unused AAudioStream *stream, void *use
 }
 
 static void aaudioErrorCallback(AAudioStream *stream, void *userData, __unused int32_t error) {
-    if (AAudioStream_getState(stream) == AAUDIO_STREAM_STATE_DISCONNECTED) { // If the audio routing has been changed, restart audio I/O.
+    if (userData && (AAudioStream_getState(stream) == AAUDIO_STREAM_STATE_DISCONNECTED)) { // If the audio routing has been changed, restart audio I/O.
         SuperpoweredAndroidAudioIOInternals *internals = (SuperpoweredAndroidAudioIOInternals *)userData;
         if (!internals->aaudioRestarting) {
             internals->aaudioRestarting = true;
@@ -242,25 +242,25 @@ static bool startAAudio(SuperpoweredAndroidAudioIOInternals *internals) {
     // However on many devices (such as the Samsung S10e) it doesn't return with audio if there is no output.
     // Therefore we set up an output stream even if not needed.
     //if (internals->hasOutput) {
-    AAudioStreamBuilder *outputStreamBuilder;
-    if (AAudio_createStreamBuilder(&outputStreamBuilder) != AAUDIO_OK) return false;
+        AAudioStreamBuilder *outputStreamBuilder;
+        if (AAudio_createStreamBuilder(&outputStreamBuilder) != AAUDIO_OK) return false;
 
-    AAudioStreamBuilder_setDirection(outputStreamBuilder, AAUDIO_DIRECTION_OUTPUT);
-    AAudioStreamBuilder_setFormat(outputStreamBuilder, AAUDIO_FORMAT_PCM_I16);
-    AAudioStreamBuilder_setChannelCount(outputStreamBuilder, NUM_CHANNELS);
-    AAudioStreamBuilder_setSharingMode(outputStreamBuilder, AAUDIO_SHARING_MODE_EXCLUSIVE);
-    AAudioStreamBuilder_setPerformanceMode(outputStreamBuilder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
-    AAudioStreamBuilder_setErrorCallback(outputStreamBuilder, aaudioErrorCallback, internals);
-    AAudioStreamBuilder_setDataCallback(outputStreamBuilder, aaudioProcessingCallback, internals);
+        AAudioStreamBuilder_setDirection(outputStreamBuilder, AAUDIO_DIRECTION_OUTPUT);
+        AAudioStreamBuilder_setFormat(outputStreamBuilder, AAUDIO_FORMAT_PCM_I16);
+        AAudioStreamBuilder_setChannelCount(outputStreamBuilder, NUM_CHANNELS);
+        AAudioStreamBuilder_setSharingMode(outputStreamBuilder, AAUDIO_SHARING_MODE_EXCLUSIVE);
+        AAudioStreamBuilder_setPerformanceMode(outputStreamBuilder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+        AAudioStreamBuilder_setErrorCallback(outputStreamBuilder, aaudioErrorCallback, internals);
+        AAudioStreamBuilder_setDataCallback(outputStreamBuilder, aaudioProcessingCallback, internals);
 
-    bool success = (AAudioStreamBuilder_openStream(outputStreamBuilder, &internals->outputStream) == AAUDIO_OK) && (internals->outputStream != NULL);
-    AAudioStreamBuilder_delete(outputStreamBuilder);
+        bool success = (AAudioStreamBuilder_openStream(outputStreamBuilder, &internals->outputStream) == AAUDIO_OK) && (internals->outputStream != NULL);
+        AAudioStreamBuilder_delete(outputStreamBuilder);
 
-    if (success) mainStream = internals->outputStream;
-    else {
-        internals->outputStream = NULL;
-        return false;
-    }
+        if (success) mainStream = internals->outputStream;
+        else {
+            internals->outputStream = NULL;
+            return false;
+        }
     //}
 
     if (internals->hasInput) {
