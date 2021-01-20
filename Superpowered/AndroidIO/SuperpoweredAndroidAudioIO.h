@@ -43,6 +43,12 @@ public:
 
 /// @brief resets the read/write indices of the input FIFO buffer to present accumulating latency
     void resetInputBufferIndices();
+
+/// @brief True, if AAudio was successfully initialized.
+    bool isAAudioInitialized();
+
+/// @brief True, if the AAudio thread is restarting due to a stream disconnect event.
+    bool isAAudioRestarting();
 private:
     SuperpoweredAndroidAudioIOInternals *internals;
     SuperpoweredAndroidAudioIO(const SuperpoweredAndroidAudioIO&);

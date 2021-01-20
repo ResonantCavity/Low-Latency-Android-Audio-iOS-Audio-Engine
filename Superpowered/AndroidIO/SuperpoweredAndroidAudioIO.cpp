@@ -550,6 +550,14 @@ void SuperpoweredAndroidAudioIO::stop() {
     if (internals->aaudio) stopAAudio(internals); else stopQueues(internals);
 }
 
+bool SuperpoweredAndroidAudioIO::isAAudioInitialized() {
+    return internals->aaudio;
+}
+
+bool SuperpoweredAndroidAudioIO::isAAudioRestarting() {
+    return internals->aaudio && internals->aaudioRestarting;
+}
+
 void SuperpoweredAndroidAudioIO::resetInputBufferIndices() {
     if (internals->inputFifo.readIndex != internals->inputFifo.writeIndex) {
         internals->inputFifo.readIndex = internals->inputFifo.writeIndex;
