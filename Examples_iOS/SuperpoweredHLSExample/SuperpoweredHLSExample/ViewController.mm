@@ -53,7 +53,7 @@ static const char *urls[8] = {
     [self.view insertSubview:bufferIndicator belowSubview:seekSlider];
 
     displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(onDisplayLink)];
-    displayLink.frameInterval = 1;
+    displayLink.preferredFramesPerSecond = 60;
     [displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
 
     audioIO = [[SuperpoweredIOSAudioIO alloc] initWithDelegate:(id<SuperpoweredIOSAudioIODelegate>)self preferredBufferSize:12 preferredSamplerate:44100 audioSessionCategory:AVAudioSessionCategoryPlayback channels:2 audioProcessingCallback:audioProcessing clientdata:(__bridge void *)self];
@@ -68,7 +68,7 @@ static const char *urls[8] = {
     audioIO = nil;
     bufferIndicator = nil;
     delete player;
-    Superpowered::AdvancedAudioPlayer::clearTempFolder();
+    Superpowered::AdvancedAudioPlayer::setTempFolder(NULL);
 }
 
 // Called periodically by the operating system's audio stack to provide audio output.
@@ -86,10 +86,10 @@ static bool audioProcessing(void *clientdata, float **inputBuffers, unsigned int
 - (void)onDisplayLink {
     // Check player events.
     switch (player->getLatestEvent()) {
-        case Superpowered::PlayerEvent_Opened:
+        case Superpowered::AdvancedAudioPlayer::PlayerEvent_Opened:
             player->play();
             break;
-        case Superpowered::PlayerEvent_OpenFailed:
+        case Superpowered::AdvancedAudioPlayer::PlayerEvent_OpenFailed:
             NSLog(@"Open error %i: %s", player->getOpenErrorCode(), Superpowered::AdvancedAudioPlayer::statusCodeToString(player->getOpenErrorCode()));
             break;
         default:;

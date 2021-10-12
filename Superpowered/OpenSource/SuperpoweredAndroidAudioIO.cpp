@@ -10,6 +10,8 @@
 #include <dlfcn.h>
 #include <android/log.h>
 
+#define USE_AAUDIO 0
+
 #define AAUDIO_CALLBACK_RESULT_CONTINUE  0
 #define AAUDIO_OK 0
 #define AAUDIO_STREAM_STATE_DISCONNECTED 13
@@ -66,6 +68,9 @@ static bool aaudioInitialized = false;
 static bool aaudioAvailable = false;
 
 static bool initializeAAudio() {
+    #if (USE_AAUDIO == 0)
+    return false;
+    #endif
     if (aaudioInitialized) return aaudioAvailable;
     aaudioInitialized = true;
 
@@ -180,15 +185,32 @@ static int32_t aaudioProcessingCallback(__unused AAudioStream *stream, void *use
             } while (drainedFrames > 0);
         }
 
-        if (AAudioStream_read(internals->inputStream, audioData, numFrames, 0) != numFrames) return AAUDIO_CALLBACK_RESULT_CONTINUE;
+        if (AAudioStream_read(internals->inputStream, audioData, numFrames, 0) != numFrames) {
+            if (internals->outputStream) memset(audioData, 0, (size_t)numFrames * NUM_CHANNELS * 2);
+            return AAUDIO_CALLBACK_RESULT_CONTINUE;
+        }
     }
+
+    bool makeSilence = false;
+    if (!internals->callback(internals->clientdata, (short int *)audioData, numFrames, internals->samplerate)) {
+        makeSilence = true;
+        internals->silenceFrames += numFrames;
+    } else internals->silenceFrames = 0;
+
+    // Silence the output if it's not needed.
+    if (!internals->hasOutput || makeSilence) memset(audioData, 0, (size_t)numFrames * NUM_CHANNELS * 2);
+
+    if (!internals->foreground && (internals->silenceFrames > internals->samplerate)) {
+        internals->silenceFrames = 0;
+        stopAAudio(internals);
+    };
 
     if (internals->aaudioFirstHalfSecond >= 0) internals->aaudioFirstHalfSecond -= numFrames;
     else {
         int xrunCount = internals->inputStream ? AAudioStream_getXRunCount(internals->inputStream) : 0;
         if (internals->outputStream) xrunCount += AAudioStream_getXRunCount(internals->outputStream);
 
-        if (internals->aaudioXRunCount != xrunCount) {
+        if (internals->aaudioXRunCount < xrunCount) {
             internals->aaudioXRunCount = xrunCount;
             if (internals->buffersize < 4096) internals->buffersize += internals->aaudioBurstSize;
             if (internals->inputStream) AAudioStream_setBufferSizeInFrames(internals->inputStream, internals->buffersize);
@@ -196,21 +218,11 @@ static int32_t aaudioProcessingCallback(__unused AAudioStream *stream, void *use
         }
     }
 
-    if (!internals->callback(internals->clientdata, (short int *)audioData, numFrames, internals->samplerate)) {
-        memset(audioData, 0, (size_t)numFrames * NUM_CHANNELS * 2);
-        internals->silenceFrames += numFrames;
-    } else internals->silenceFrames = 0;
-
-    if (!internals->foreground && (internals->silenceFrames > internals->samplerate)) {
-        internals->silenceFrames = 0;
-        stopAAudio(internals);
-    };
-
     return AAUDIO_CALLBACK_RESULT_CONTINUE;
 }
 
 static void aaudioErrorCallback(AAudioStream *stream, void *userData, __unused int32_t error) {
-    if (AAudioStream_getState(stream) == AAUDIO_STREAM_STATE_DISCONNECTED) { // If the audio routing has been changed, restart audio I/O.
+    if (userData && (AAudioStream_getState(stream) == AAUDIO_STREAM_STATE_DISCONNECTED)) { // If the audio routing has been changed, restart audio I/O.
         SuperpoweredAndroidAudioIOInternals *internals = (SuperpoweredAndroidAudioIOInternals *)userData;
         if (!internals->aaudioRestarting) {
             internals->aaudioRestarting = true;
@@ -226,7 +238,10 @@ static bool startAAudio(SuperpoweredAndroidAudioIOInternals *internals) {
     internals->aaudioRestarting = false;
     AAudioStream *mainStream = NULL;
 
-    if (internals->hasOutput) {
+    // Theoretically AAudio should work with an input stream only.
+    // However on many devices (such as the Samsung S10e) it doesn't return with audio if there is no output.
+    // Therefore we set up an output stream even if not needed.
+    //if (internals->hasOutput) {
         AAudioStreamBuilder *outputStreamBuilder;
         if (AAudio_createStreamBuilder(&outputStreamBuilder) != AAUDIO_OK) return false;
 
@@ -246,7 +261,7 @@ static bool startAAudio(SuperpoweredAndroidAudioIOInternals *internals) {
             internals->outputStream = NULL;
             return false;
         }
-    }
+    //}
 
     if (internals->hasInput) {
         AAudioStreamBuilder *inputStreamBuilder;
@@ -269,7 +284,7 @@ static bool startAAudio(SuperpoweredAndroidAudioIOInternals *internals) {
         if (!internals->outputStream) AAudioStreamBuilder_setDataCallback(inputStreamBuilder, aaudioProcessingCallback, internals);
         else AAudioStreamBuilder_setSampleRate(inputStreamBuilder, AAudioStream_getSampleRate(internals->outputStream));
 
-        bool success = (AAudioStreamBuilder_openStream(inputStreamBuilder, &internals->inputStream) == AAUDIO_OK) && (internals->inputStream != NULL);
+        success = (AAudioStreamBuilder_openStream(inputStreamBuilder, &internals->inputStream) == AAUDIO_OK) && (internals->inputStream != NULL);
         AAudioStreamBuilder_delete(inputStreamBuilder);
 
         if (success) {
@@ -405,6 +420,7 @@ static void SuperpoweredAndroidAudioIO_OutputCallback(SLAndroidSimpleBufferQueue
 
 SuperpoweredAndroidAudioIO::SuperpoweredAndroidAudioIO(int samplerate, int buffersize, bool enableInput, bool enableOutput, audioProcessingCallback callback, void *clientdata, int inputStreamType, int outputStreamType) {
     static const SLboolean requireds[2] = { SL_BOOLEAN_TRUE, SL_BOOLEAN_FALSE };
+    if (buffersize > 1024) buffersize = 1024;
 
     internals = new SuperpoweredAndroidAudioIOInternals;
     memset(internals, 0, sizeof(SuperpoweredAndroidAudioIOInternals));
@@ -430,7 +446,6 @@ SuperpoweredAndroidAudioIO::SuperpoweredAndroidAudioIO(int samplerate, int buffe
         case -1: break;
         default: internals->aaudio = false;
     }
-
 
     if (internals->aaudio) internals->aaudio = startAAudio(internals);
     if (!internals->aaudio) {

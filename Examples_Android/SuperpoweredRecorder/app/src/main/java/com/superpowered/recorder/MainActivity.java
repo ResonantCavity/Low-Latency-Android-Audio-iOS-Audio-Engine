@@ -1,36 +1,34 @@
 package com.superpowered.recorder;
 
 import android.Manifest;
-import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.media.AudioManager;
-import android.os.Environment;
+import android.net.Uri;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.appcompat.app.AppCompatActivity;
 import android.os.Bundle;
+import android.os.ParcelFileDescriptor;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
+import java.io.FileNotFoundException;
 
 public class MainActivity extends AppCompatActivity {
     private boolean recording = false;
-    private String tempPath;
-    private String destPath;
-    private int samplerate;
-    private int buffersize;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        Button b = findViewById(R.id.startStop);
+        b.setVisibility(View.GONE);
 
         // Checking permissions.
         String[] permissions = {
-                Manifest.permission.RECORD_AUDIO,
-                Manifest.permission.WRITE_EXTERNAL_STORAGE
+                Manifest.permission.RECORD_AUDIO
         };
         for (String s:permissions) {
             if (ContextCompat.checkSelfPermission(this, s) != PackageManager.PERMISSION_GRANTED) {
@@ -40,8 +38,8 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        // Got all permissions, initialize.
-        initialize();
+        // Got all permissions, show button.
+        showButton();
     }
 
     @Override
@@ -55,64 +53,56 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(getApplicationContext(), "Please allow all permissions for the app.", Toast.LENGTH_LONG).show();
         }
 
-        if (hasAllPermissions) initialize();
+        if (hasAllPermissions) showButton();
     }
 
-    private void initialize() {
-        // Get the device's sample rate and buffer size to enable
-        // low-latency Android audio output, if available.
-        String samplerateString = null, buffersizeString = null;
-        AudioManager audioManager = (AudioManager) this.getSystemService(Context.AUDIO_SERVICE);
-        if (audioManager != null) {
-            samplerateString = audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE);
-            buffersizeString = audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER);
+    private void showButton() {
+        Button b = findViewById(R.id.startStop);
+        b.setVisibility(View.VISIBLE);
+    }
+
+    private void updateButton() {
+        Button b = findViewById(R.id.startStop);
+        b.setText(recording ? "Stop" : "Start");
+    }
+
+    // Handle the return of the save as dialog.
+    public void onActivityResult(int requestCode, int resultCode, Intent resultData) {
+        super.onActivityResult(requestCode, resultCode, resultData);
+        if (resultCode == android.app.Activity.RESULT_OK) {
+            if ((requestCode == 0) && (resultData != null)) {
+                Uri u = resultData.getData();
+                try {
+                    ParcelFileDescriptor pfd = getContentResolver().openFileDescriptor(u, "w");
+                    if (pfd != null) {
+                        Intent serviceIntent = new Intent(this, RecorderService.class);
+                        serviceIntent.putExtra("fileDescriptor", pfd.detachFd());
+                        ContextCompat.startForegroundService(this, serviceIntent);
+                        recording = true;
+                        updateButton();
+                    } else Log.d("Recorder", "File descriptor is null.");
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                }
+            }
         }
-        if (samplerateString == null) samplerateString = "48000";
-        if (buffersizeString == null) buffersizeString = "480";
-        samplerate = Integer.parseInt(samplerateString);
-        buffersize = Integer.parseInt(buffersizeString);
-
-        System.loadLibrary("RecorderExample");             // load native library
-        tempPath = getCacheDir().getAbsolutePath() + "/temp.wav";  // temporary file path
-        destPath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/recording";       // destination file path
-
-        Log.d("Recorder", "Temporary file: " + tempPath);
-        Log.d("Recorder", "Destination file: " + destPath + ".wav");
     }
 
     // Handle Start/Stop button toggle.
     public void ToggleStartStop(View button) {
         if (recording) {
-            StopRecording();
+            Intent serviceIntent = new Intent(this, RecorderService.class);
+            serviceIntent.setAction("stop");
+            startService(serviceIntent);
             recording = false;
+            updateButton();
         } else {
-            StartAudio(samplerate, buffersize, tempPath, destPath);
-            recording = true;
+            // Open the file browser to pick a destination.
+            android.content.Intent intent = new android.content.Intent(Intent.ACTION_CREATE_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.setType("application/octet-stream");
+            intent.putExtra(Intent.EXTRA_TITLE, "recording.wav");
+            startActivityForResult(intent, 0);
         }
-        Button b = findViewById(R.id.startStop);
-        b.setText(recording ? "Stop" : "Start");
     }
-
-    @Override
-    public void onPause() {
-        super.onPause();
-        if (recording) onBackground();
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        if (recording) onForeground();
-    }
-
-    protected void onDestroy() {
-        super.onDestroy();
-        if (recording) StopRecording();
-    }
-
-    // Functions implemented in the native library.
-    private native void StartAudio(int samplerate, int buffersize, String tempPath, String destPath);
-    private native void onForeground();
-    private native void onBackground();
-    private native void StopRecording();
 }
