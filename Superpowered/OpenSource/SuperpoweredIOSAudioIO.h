@@ -33,6 +33,9 @@ typedef struct multiInputChannelMap {
 
 @protocol SuperpoweredIOSAudioIODelegate;
 
+// For calling back to the audio service after a system callback reinitializes the audio unit
+typedef void (*resetCallback)(void);
+
 /// @brief The audio processing callback prototype.
 /// @return Return false for no audio output (silence).
 /// @param clientData A custom pointer your callback receives.
@@ -68,7 +71,15 @@ typedef bool (*audioProcessingCallback) (void *clientData, float **inputBuffers,
 /// @param channels The number of output channels in the audio processing callback regardless the actual hardware capabilities. The number of input channels in the audio processing callback will reflect the actual hardware configuration.
 /// @param callback The audio processing callback.
 /// @param clientdata Custom data passed to the audio processing callback.
-- (id)initWithDelegate:(id<SuperpoweredIOSAudioIODelegate>)delegate preferredBufferSize:(unsigned int)preferredBufferSize preferredSamplerate:(unsigned int)preferredSamplerate audioSessionCategory:(NSString *)audioSessionCategory channels:(int)channels audioProcessingCallback:(audioProcessingCallback)callback clientdata:(void *)clientdata;
+- (id)initWithDelegate:(id<SuperpoweredIOSAudioIODelegate>)delegate
+   preferredBufferSize:(unsigned int)preferredBufferSize
+   preferredSamplerate:(unsigned int)preferredSamplerate
+  audioSessionCategory:(NSString *)audioSessionCategory
+              channels:(int)channels
+audioProcessingCallback:(audioProcessingCallback)callback
+         resetCallback:(resetCallback)rc1
+         resetCallback:(resetCallback)rc2
+            clientdata:(void *)clientdata;
 
 /// @brief Starts audio I/O.
 /// @return True if successful, false if failed.

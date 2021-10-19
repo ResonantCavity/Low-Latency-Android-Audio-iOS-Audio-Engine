@@ -19,26 +19,36 @@ public:
 /// @param buffersize The requested buffer size (number of frames).
 /// @param enableInput Enable audio input.
 /// @param enableOutput Enable audio output.
+/// @param preferAAudio Prefer AAudio (vs OpenSL) if available on the device.
 /// @param callback The audio processing callback function to call periodically.
 /// @param clientdata A custom pointer the callback receives.
 /// @param inputStreamType OpenSL ES stream type, such as SL_ANDROID_RECORDING_PRESET_GENERIC. -1 means default. SLES/OpenSLES_AndroidConfiguration.h has them.
 /// @param outputStreamType OpenSL ES stream type, such as SL_ANDROID_STREAM_MEDIA or SL_ANDROID_STREAM_VOICE. -1 means default. SLES/OpenSLES_AndroidConfiguration.h has them.
-    SuperpoweredAndroidAudioIO(int samplerate, int buffersize, bool enableInput, bool enableOutput, audioProcessingCallback callback, void *clientdata, int inputStreamType = -1, int outputStreamType = -1);
+    SuperpoweredAndroidAudioIO(int samplerate, int buffersize, bool enableInput, bool enableOutput, bool preferAAudio, audioProcessingCallback callback, void *clientdata, int inputStreamType = -1, int outputStreamType = -1);
     ~SuperpoweredAndroidAudioIO();
 
 /// @brief Call this in the main activity's onResume() method.
 /// Calling this is important if you'd like to save battery. When there is no audio playing and the app goes to the background, it will automatically stop audio input and/or output.
     void onForeground();
-    
+
 /// @brief Call this in the main activity's onPause() method.
 /// Calling this is important if you'd like to save battery. When there is no audio playing and the app goes to the background, it will automatically stop audio input and/or output.
     void onBackground();
-    
+
 /// @brief Starts audio input and/or output.
     void start();
-    
+
 /// @brief Stops audio input and/or output.
     void stop();
+
+/// @brief resets the read/write indices of the input FIFO buffer to present accumulating latency
+    void resetInputBufferIndices();
+
+/// @brief True, if AAudio was successfully initialized.
+    bool isAAudioInitialized();
+
+/// @brief True, if the AAudio thread is restarting due to a stream disconnect event.
+    bool isAAudioRestarting();
 
 private:
     SuperpoweredAndroidAudioIOInternals *internals;

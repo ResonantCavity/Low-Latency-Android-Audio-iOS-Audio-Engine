@@ -28,6 +28,8 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
     NSTimer *stopTimer;
     NSMutableString *audioSystemInfo;
     audioProcessingCallback processingCallback;
+    resetCallback resetCallback1;
+    resetCallback resetCallback2;
     void *processingClientdata;
     AudioBufferList *inputBufferListForRecordingCategory;
     AudioComponentInstance audioUnit;
@@ -51,7 +53,15 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
     };
 }
 
-- (id)initWithDelegate:(NSObject<SuperpoweredIOSAudioIODelegate> *)d preferredBufferSize:(unsigned int)preferredBufferSize preferredSamplerate:(unsigned int)prefsamplerate audioSessionCategory:(NSString *)category channels:(int)channels audioProcessingCallback:(audioProcessingCallback)callback clientdata:(void *)clientdata {
+- (id)initWithDelegate:(NSObject<SuperpoweredIOSAudioIODelegate> *)d
+   preferredBufferSize:(unsigned int)preferredBufferSize
+   preferredSamplerate:(unsigned int)prefsamplerate
+   audioSessionCategory:(NSString *)category
+   channels:(int)channels
+   audioProcessingCallback:(audioProcessingCallback)callback
+         resetCallback:(resetCallback)rc1
+         resetCallback:(resetCallback)rc2
+   clientdata:(void *)clientdata {
     self = [super init];
     if (self) {
         numChannels = channels;
@@ -72,6 +82,8 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
         inputEnabled = false;
 #endif
         processingCallback = callback;
+        resetCallback1 = rc1;
+        resetCallback2 = rc2;
         processingClientdata = clientdata;
         delegate = d;
         audioSystemInfo = [[NSMutableString alloc] initWithCapacity:256];
@@ -313,6 +325,7 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
 
 - (void)resetAudio {
     if (audioUnit != NULL) {
+        self->resetCallback1();
         AudioUnitUninitialize(audioUnit);
         AudioComponentInstanceDispose(audioUnit);
         audioUnit = NULL;
@@ -340,6 +353,7 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
 
     audioUnit = [self createRemoteIO];
     if (!multiRoute) [self onRouteChange:nil];
+    self->resetCallback2();
 }
 
 /*
@@ -422,13 +436,13 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
     AudioUnit au;
 
     AudioComponentDescription desc;
-	desc.componentType = kAudioUnitType_Output;
-	desc.componentSubType = kAudioUnitSubType_RemoteIO;
-	desc.componentFlags = 0;
-	desc.componentFlagsMask = 0;
-	desc.componentManufacturer = kAudioUnitManufacturer_Apple;
-	AudioComponent component = AudioComponentFindNext(NULL, &desc);
-	if (AudioComponentInstanceNew(component, &au) != 0) return NULL;
+    desc.componentType = kAudioUnitType_Output;
+    desc.componentSubType = kAudioUnitSubType_RemoteIO;
+    desc.componentFlags = 0;
+    desc.componentFlagsMask = 0;
+    desc.componentManufacturer = kAudioUnitManufacturer_Apple;
+    AudioComponent component = AudioComponentFindNext(NULL, &desc);
+    if (AudioComponentInstanceNew(component, &au) != 0) return NULL;
 
     bool recordOnly = [audioSessionCategory isEqualToString:AVAudioSessionCategoryRecord];
     UInt32 value = recordOnly ? 0 : 1;
