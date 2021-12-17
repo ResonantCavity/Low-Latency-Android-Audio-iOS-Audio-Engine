@@ -74,6 +74,7 @@ typedef bool (*audioProcessingCallback) (void *clientdata, float *inputBuffer, f
    preferredBufferSize:(unsigned int)preferredBufferSize
    preferredSamplerate:(unsigned int)preferredSamplerate
   audioSessionCategory:(NSString *)audioSessionCategory
+  audioSessionCategoryOptions:(AVAudioSessionCategoryOptions)audioSessionCategoryOptions
               channels:(int)channels
 audioProcessingCallback:(audioProcessingCallback)callback
          resetCallback:(resetCallback)rc1
