@@ -35,6 +35,7 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
 #endif
     id<SuperpoweredIOSAudioIODelegate>delegate;
     NSString *externalAudioDeviceName, *audioSessionCategory;
+    AVAudioSessionCategoryOptions audioSessionCategoryOptions;
     NSTimer *stopTimer;
     NSMutableString *audioSystemInfo;
     audioProcessingCallback processingCallback;
@@ -67,6 +68,7 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
    preferredBufferSize:(unsigned int)preferredBufferSize
    preferredSamplerate:(unsigned int)prefsamplerate
    audioSessionCategory:(NSString *)category
+   audioSessionCategoryOptions:(AVAudioSessionCategoryOptions)categoryOptions
    channels:(int)channels
    audioProcessingCallback:(audioProcessingCallback)callback
          resetCallback:(resetCallback)rc1
@@ -81,6 +83,7 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
 #else
         audioSessionCategory = category;
 #endif
+        audioSessionCategoryOptions = categoryOptions;
         saveBatteryInBackground = true;
         started = false;
         preferredBufferSizeMs = preferredBufferSize;
@@ -362,7 +365,7 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
     };
 #ifdef ALLOW_BLUETOOTH
     if (multiRoute) [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryMultiRoute error:NULL];
-    else [[AVAudioSession sharedInstance] setCategory:audioSessionCategory withOptions:AVAudioSessionCategoryOptionAllowBluetoothA2DP | AVAudioSessionCategoryOptionMixWithOthers error:NULL];
+    else [[AVAudioSession sharedInstance] setCategory:audioSessionCategory withOptions:audioSessionCategoryOptions error:NULL];
 #else
     [[AVAudioSession sharedInstance] setCategory:multiRoute ? AVAudioSessionCategoryMultiRoute : audioSessionCategory error:NULL];
 #endif
