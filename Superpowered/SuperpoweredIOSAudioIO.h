@@ -120,6 +120,7 @@ typedef void (*resetCallback)(void);
    preferredBufferSize:(unsigned int)preferredBufferSize
    preferredSamplerate:(unsigned int)preferredSamplerate
   audioSessionCategory:(NSString *)audioSessionCategory
+  audioSessionCategoryOptions:(AVAudioSessionCategoryOptions)audioSessionCategoryOptions
               channels:(int)channels
 audioProcessingCallback:(audioProcessingCallback)callback
          resetCallback:(resetCallback)rc1
