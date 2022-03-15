@@ -493,6 +493,7 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
 - (bool)start {
     started = true;
     if (audioUnit == NULL) return false;
+    [self applyBuffersize];
     if (AudioOutputUnitStart(audioUnit)) return false;
     audioUnitRunning = true;
     [[AVAudioSession sharedInstance] setActive:YES error:nil];
