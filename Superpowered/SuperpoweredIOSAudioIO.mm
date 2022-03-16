@@ -510,7 +510,6 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
 - (bool)start {
     started = true;
     if (audioUnit == NULL) return false;
-    [self applyBuffersize];
     if (AudioOutputUnitStart(audioUnit)) return false;
     audioUnitRunning = true;
     [[AVAudioSession sharedInstance] setActive:YES error:nil];
@@ -523,7 +522,10 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
 }
 
 - (void)setPreferredBufferSizeMs:(int)ms {
-    if (ms == preferredBufferSizeMs) return;
+    // Removing this early return since it prevents us
+    // from actually changing the buffer size inside the audio
+    // processing block when we detect an inconsistent buffer size.
+    // if (ms == preferredBufferSizeMs) return;
     preferredBufferSizeMs = ms;
     [self applyBuffersize];
 }
