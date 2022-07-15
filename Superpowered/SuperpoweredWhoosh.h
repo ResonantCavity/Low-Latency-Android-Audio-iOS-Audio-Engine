@@ -14,6 +14,7 @@ struct whooshInternals;
  */
 class SuperpoweredWhoosh: public SuperpoweredFX {
 public:
+<<<<<<< HEAD
     float wet;
     float frequency;
     
@@ -55,6 +56,23 @@ public:
  @param numberOfSamples Number of frames to process. Recommendations for best performance: multiply of 4, minimum 64.
  */
     bool process(float *input, float *output, unsigned int numberOfSamples);
+=======
+    float wet;       ///< White noise signal volume. Limited to >= 0 and <= 1. Default: 0.4.
+    float frequency; ///< Limited to >= 20 and <= 20000. Default: 500.
+
+/// @brief Constructor. Enabled is false by default.
+/// @param samplerate The initial sample rate in Hz.
+    JSWASM Whoosh(unsigned int samplerate);
+    JSWASM ~Whoosh();
+    
+/// @brief Processes the audio. Always call it in the audio processing callback, regardless if the effect is enabled or not for smooth, audio-artifact free operation.
+/// It's never blocking for real-time usage. You can change all properties on any thread, concurrently with process().
+/// @return If process() returns with true, the contents of output are replaced with the audio output. If process() returns with false, the contents of output are not changed.
+/// @param input Pointer to floating point numbers. 32-bit interleaved stereo input. The output will be mixed to this. Can be NULL.
+/// @param output Pointer to floating point numbers. 32-bit interleaved stereo input. Can point to the same location with output (in-place processing).
+/// @param numberOfFrames Number of frames to process. Recommendation for best performance: multiply of 4, minimum 64.
+    JSWASM bool process(float *input, float *output, unsigned int numberOfFrames);
+>>>>>>> master
     
 private:
     whooshInternals *internals;

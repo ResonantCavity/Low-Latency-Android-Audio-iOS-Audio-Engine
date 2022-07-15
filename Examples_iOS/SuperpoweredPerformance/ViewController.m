@@ -73,7 +73,7 @@
     // We'll update the screen at 60 Hz.
     frame = 0;
     displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(onDisplayLink)];
-    displayLink.frameInterval = 1;
+    displayLink.preferredFramesPerSecond = 60;
     [displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
 }
 

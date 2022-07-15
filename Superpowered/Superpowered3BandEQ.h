@@ -14,6 +14,7 @@ struct eqInternals;
  */
 class Superpowered3BandEQ: public SuperpoweredFX {
 public:
+<<<<<<< HEAD
     float bands[3]; // READ-WRITE parameter.
 
 /**
@@ -52,6 +53,24 @@ public:
  @param numberOfSamples Number of frames to process. Recommendations for best performance: multiply of 4, minimum 64.
 */
     bool process(float *input, float *output, unsigned int numberOfSamples);
+=======
+    float low; ///< Low gain. Read-write. 1.0f is "flat", 2.0f is +6db. Kill is enabled under -40 db (0.01f). Default: 1.0f. Limits: 0.0f and 8.0f.
+    float mid; ///< Mid gain. Read-write. 1.0f is "flat", 2.0f is +6db. Kill is enabled under -40 db (0.01f). Default: 1.0f. Limits: 0.0f and 8.0f.
+    float high; ///< High gain. Read-write. 1.0f is "flat", 2.0f is +6db. Kill is enabled under -40 db (0.01f). Default: 1.0f. Limits: 0.0f and 8.0f.
+    
+/// @brief Constructor. Enabled is false by default.
+/// @param samplerate The initial sample rate in Hz.
+    JSWASM ThreeBandEQ(unsigned int samplerate);
+    JSWASM ~ThreeBandEQ();
+    
+/// @brief Processes the audio. Always call it in the audio processing callback, regardless if the effect is enabled or not for smooth, audio-artifact free operation.
+/// It's never blocking for real-time usage. You can change all properties on any thread, concurrently with process().
+/// @return If process() returns with true, the contents of output are replaced with the audio output. If process() returns with false, the contents of output are not changed.
+/// @param input Pointer to floating point numbers. 32-bit interleaved stereo input.
+/// @param output Pointer to floating point numbers. 32-bit interleaved stereo output. Can point to the same location with input (in-place processing).
+/// @param numberOfFrames Number of frames to process. Recommendation for best performance: multiply of 4, minimum 64.
+    JSWASM bool process(float *input, float *output, unsigned int numberOfFrames);
+>>>>>>> master
     
 private:
     eqInternals *internals;

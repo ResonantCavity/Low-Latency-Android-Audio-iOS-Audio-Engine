@@ -1,6 +1,15 @@
 #ifndef Header_SuperpoweredClipper
 #define Header_SuperpoweredClipper
 
+<<<<<<< HEAD
+=======
+#ifndef JSWASM
+#define JSWASM
+#endif
+
+namespace Superpowered {
+
+>>>>>>> master
 struct clipperInternals;
 
 /**
@@ -13,6 +22,7 @@ struct clipperInternals;
 */
 class SuperpoweredClipper {
 public:
+<<<<<<< HEAD
     float thresholdDb;
     float maximumDb;
 
@@ -27,6 +37,21 @@ public:
  @param numberOfSamples Should be 4 minimum and exactly divisible with 4.
 */
     void process(float *input, float *output, unsigned int numberOfSamples);
+=======
+    float thresholdDb; ///< Audio below this will be unchanged, above this will be attenuated. Limited between -100 and 0. Default: 0.
+    float maximumDb;   ///< Audio will reach 1.0f at this point. Limited between -48 and 48. Default: 6.
+
+/// @brief Constructor;
+    JSWASM Clipper();
+    JSWASM ~Clipper();
+
+/// @brief Processes the audio.
+/// It's never blocking for real-time usage. You can change all properties on any thread, concurrently with process().
+/// @param input Pointer to floating point numbers. 32-bit interleaved stereo input.
+/// @param output Pointer to floating point numbers. 32-bit interleaved stereo output. Can point to the same location with input (in-place processing).
+/// @param numberOfFrames Should be 4 minimum and exactly divisible with 4.
+    JSWASM void process(float *input, float *output, unsigned int numberOfFrames);
+>>>>>>> master
 
 private:
     clipperInternals *internals;

@@ -10,7 +10,11 @@
 #include <dlfcn.h>
 #include <android/log.h>
 
+<<<<<<< HEAD:Superpowered/AndroidIO/SuperpoweredAndroidAudioIO.cpp
 #define USE_AAUDIO 1
+=======
+#define USE_AAUDIO 0
+>>>>>>> master:Superpowered/OpenSource/SuperpoweredAndroidAudioIO.cpp
 
 #define AAUDIO_CALLBACK_RESULT_CONTINUE  0
 #define AAUDIO_OK 0
@@ -284,7 +288,7 @@ static bool startAAudio(SuperpoweredAndroidAudioIOInternals *internals) {
         if (!internals->outputStream) AAudioStreamBuilder_setDataCallback(inputStreamBuilder, aaudioProcessingCallback, internals);
         else AAudioStreamBuilder_setSampleRate(inputStreamBuilder, AAudioStream_getSampleRate(internals->outputStream));
 
-        bool success = (AAudioStreamBuilder_openStream(inputStreamBuilder, &internals->inputStream) == AAUDIO_OK) && (internals->inputStream != NULL);
+        success = (AAudioStreamBuilder_openStream(inputStreamBuilder, &internals->inputStream) == AAUDIO_OK) && (internals->inputStream != NULL);
         AAudioStreamBuilder_delete(inputStreamBuilder);
 
         if (success) {

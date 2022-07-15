@@ -1,6 +1,7 @@
 #ifndef Header_SuperpoweredAnalyzer
 #define Header_SuperpoweredAnalyzer
 
+<<<<<<< HEAD
 #define SUPERPOWERED_WAVEFORM_POINTS_PER_SEC 150
 
 struct analyzerInternals;
@@ -68,6 +69,13 @@ private:
  @param note The number of the note. Note 0 is the standard A note at 440 Hz.
  */
 float frequencyOfNote(int note);
+=======
+#ifndef JSWASM
+#define JSWASM
+#endif
+
+namespace Superpowered {
+>>>>>>> master
 
 static const char *musicalChordNames[24] = {
     "A", "A#", "B", "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", // major
@@ -99,6 +107,7 @@ static const int camelotSort[24] = {
     14, 4, 18, 8, 22, 12, 2, 16, 6, 20, 10, 0
 };
 
+<<<<<<< HEAD
 /**
  @brief Provides compact waveform data (150 points/sec and 1 point/sec resolution)
 */
@@ -111,10 +120,82 @@ public:
 */
     SuperpoweredWaveform(unsigned int samplerate, int lengthSeconds);
     ~SuperpoweredWaveform();
+=======
+#define SUPERPOWERED_WAVEFORM_POINTS_PER_SEC 150
+
+struct analyzerInternals;
+struct waveformInternals;
+struct liveAnalyzerInternals;
+
+/// @brief Performs bpm and key detection, loudness/peak analysis. Provides compact waveform data (150 points/sec and 1 point/sec resolution), beatgrid information.
+class Analyzer {
+public:
+    float peakDb;                   ///< Peak volume in decibels. Available after calling makeResults().
+    float averageDb;                ///< Average volume in decibels. Available after calling makeResults().
+    float loudpartsAverageDb;       ///< The average volume of the "loud" parts in decibel. (Quiet parts excluded.) Available after calling makeResults().
+    float bpm;                      ///< Beats per minute. Available after calling makeResults().
+    float beatgridStartMs;          ///< Where the beatgrid starts (first beat) in milliseconds. Available after calling makeResults().
+    int keyIndex;                   ///< The dominant key (chord) of the music. 0..11 are major keys from A to G#, 12..23 are minor keys from A to G#. Check the static constants in this header for musical, Camelot and Open Key notations.
+    int waveformSize;               ///< The number of bytes in the peak, average, low, mid and high waveforms and notes.
+    int overviewSize;               ///< The number bytes in overviewWaveform.
+
+/// @brief Constructor.
+/// @param samplerate The sample rate of the audio input.
+/// @param lengthSeconds The length in seconds of the audio input. The analyzer will not be able to process more audio than this. You can change this value in the process() method.
+    JSWASM Analyzer(unsigned int samplerate, int lengthSeconds);
+    JSWASM ~Analyzer();
+
+/// @brief Processes some audio. This method can be used in a real-time audio thread if lengthSeconds is -1.
+/// @param input Pointer to floating point numbers. 32-bit interleaved stereo input.
+/// @param numberOfFrames Number of frames to process.
+/// @param lengthSeconds If the audio input length may change, set this to the current length. Use -1 otherwise. If this value is not -1, this method can NOT be used in a real-time audio thread.
+    JSWASM void process(float *input, unsigned int numberOfFrames, int lengthSeconds = -1);
+
+/// @brief Makes results from the collected data. This method should NOT be used in a real-time audio thread, because it allocates memory.
+/// @param minimumBpm Detected bpm will be more than or equal to this. Recommended value: 60.
+/// @param maximumBpm Detected bpm will be less than or equal to this. Recommended value: 200.
+/// @param knownBpm If you know the bpm set it here. Use 0 otherwise.
+/// @param aroundBpm Provides a "hint" for the analyzer with this. Use 0 otherwise.
+/// @param getBeatgridStartMs True: calculate beatgridStartMs. False: save some CPU with not calculating it.
+/// @param aroundBeatgridStartMs Provides a "hint" for the analyzer with this. Use 0 otherwise.
+/// @param makeOverviewWaveform True: make overviewWaveform. False: save some CPU and memory with not making it.
+/// @param makeLowMidHighWaveforms True: make the low/mid/high waveforms. False: save some CPU and memory with not making them.
+/// @param getKeyIndex True: calculate keyIndex. False: save some CPU with not calculating it.
+    JSWASM void makeResults(float minimumBpm, float maximumBpm, float knownBpm, float aroundBpm, bool getBeatgridStartMs, float aroundBeatgridStartMs, bool makeOverviewWaveform, bool makeLowMidHighWaveforms, bool getKeyIndex);
+
+/// @brief Returns with 150 points/sec waveform data displaying the peak volume. Each number is an unsigned byte (8-bits), representing one "pixel". Available after calling makeResults().
+/// @param takeOwnership If true, you take ownership on the data, so don't forget to free() the memory to prevent memory leaks. Use _aligned_free() on Windows.
+    JSWASM unsigned char *getPeakWaveform(bool takeOwnership = false);
+
+/// @brief Returns with 150 points/sec waveform data displaying the average volume. Each number is an unsigned byte (8-bits), representing one "pixel". Available after calling makeResults().
+/// @param takeOwnership If true, you take ownership on the data, so don't forget to free() the memory to prevent memory leaks. Use _aligned_free() on Windows.
+    JSWASM unsigned char *getAverageWaveform(bool takeOwnership = false);
+
+/// @brief Returns with 150 points/sec waveform data displaying the low frequencies below 200 Hz. Each number is an unsigned byte (8-bits), representing one "pixel". Available after calling makeResults().
+/// @param takeOwnership If true, you take ownership on the data, so don't forget to free() the memory to prevent memory leaks. Use _aligned_free() on Windows.
+    JSWASM unsigned char *getLowWaveform(bool takeOwnership = false);
+
+/// @brief Returns with 150 points/sec waveform data displaying the mid frequencies between 200 and 1600 Hz. Each number is an unsigned byte (8-bits), representing one "pixel". Available after calling makeResults().
+/// @param takeOwnership If true, you take ownership on the data, so don't forget to free() the memory to prevent memory leaks. Use _aligned_free() on Windows.
+    JSWASM unsigned char *getMidWaveform(bool takeOwnership = false);
+
+/// @brief Returns with 150 points/sec waveform data displaying the high frequencies above 1600 Hz. Each number is an unsigned byte (8-bits), representing one "pixel". Available after calling makeResults().
+/// @param takeOwnership If true, you take ownership on the data, so don't forget to free() the memory to prevent memory leaks. Use _aligned_free() on Windows.
+    JSWASM unsigned char *getHighWaveform(bool takeOwnership = false);
+
+/// @brief Returns with 150 points/sec waveform data displaying the bass and mid keys. Each bytes is further divided to 4-4 bits, representing one "pixel". Upper 4 bits are the bass notes 0 to 11, lower 4 bits are the mid notes 0 to 11 (C, C#, D, D#, E, F, F#, G, G#, A, A#, B). The note value is 12 means "unknown note due low volume". Available after calling makeResults().
+/// @param takeOwnership If true, you take ownership on the data, so don't forget to free() the memory to prevent memory leaks. Use _aligned_free() on Windows.
+    JSWASM unsigned char *getNotes(bool takeOwnership = false);
+
+/// @brief Returns with 1 point/sec waveform data displaying the average volume in decibels. Useful for displaying the overall structure of a track. Each number is a signed byte (8-bits), representing one "pixel". Values are between -128 and 0, in decibels. Available after calling makeResults().
+/// @param takeOwnership If true, you take ownership on the data, so don't forget to free() the memory to prevent memory leaks. Use _aligned_free() on Windows.
+    JSWASM char *getOverviewWaveform(bool takeOwnership = false);
+>>>>>>> master
 
 /**
  @brief Processes a chunk of audio. This method can be used in a real-time audio thread if lengthSeconds is -1.
 
+<<<<<<< HEAD
  @param input 32-bit interleaved floating-point input.
  @param numberOfFrames How many frames to process.
  @param lengthSeconds If the source's length may change, set this to it's current value, leave it at -1 otherwise. If this value is not -1, this method can NOT be used in a real-time audio thread.
@@ -127,6 +208,31 @@ public:
  @param size The number of points in the waveform data.
  */
     unsigned char *getresult(int *size);
+=======
+/// @brief Provides waveform data in 150 points/sec resolution.
+class Waveform {
+public:
+    int waveformSize;            ///< The number of bytes in the peak waveform.
+
+/// @brief Constructor.
+/// @param samplerate The sample rate of the audio input.
+/// @param lengthSeconds The length in seconds of the audio input. It will not be able to process more audio than this. You can change this value in the process() method.
+    JSWASM Waveform(unsigned int samplerate, int lengthSeconds);
+    JSWASM ~Waveform();
+
+/// @brief Processes some audio. This method can be used in a real-time audio thread if lengthSeconds is -1.
+/// @param input Pointer to floating point numbers. 32-bit interleaved stereo input.
+/// @param numberOfFrames Number of frames to process.
+/// @param lengthSeconds If the audio input length may change, set this to the current length. Use -1 otherwise. If this value is not -1, this method can NOT be used in a real-time audio thread.
+    JSWASM void process(float *input, unsigned int numberOfFrames, int lengthSeconds = -1);
+
+/// @brief Makes the result from the collected data. This method should NOT be used in a real-time audio thread.
+    JSWASM void makeResult();
+
+/// @brief Returns with 150 points/sec waveform data displaying the peak volume. Each number is an unsigned byte (8-bits), representing one "pixel". Available after calling makeResults().
+/// @param takeOwnership If true, you take ownership on the data, so don't forget to free() the memory to prevent memory leaks. Use _aligned_free() on Windows.
+    JSWASM unsigned char *getPeakWaveform(bool takeOwnership = false);
+>>>>>>> master
 
 private:
     waveformInternals *internals;
@@ -136,6 +242,7 @@ private:
 
 class SuperpoweredLiveAnalyzer {
 public:
+<<<<<<< HEAD
     float bpm;
     int keyIndex; // READ ONLY
     bool silence; // READ ONLY
@@ -161,6 +268,26 @@ public:
  */
     void setSamplerate(unsigned int samplerate);
     
+=======
+    float bpm;               ///< Current beats per minute. If the current result is too far from the reality you can do three things:
+                             ///< 1. Set bpm to zero. This forces the analyzer to "forget" the last bpm and may find the correct value within 10 seconds.
+                             ///< 2. Set bpm to an estimated value. This forces the analyzer to "forget" the last bpm and use your estimate instead. It may find the correct value within 4 seconds.
+                             ///< 3. Set bpm to a negative value. This will "hard reset" the analyzer and so it will start fresh.
+    int keyIndex;            ///< The dominant key (chord) of the music. 0..11 are major keys from A to G#, 12..23 are minor keys from A to G#. -1: unknown. Check the static constants in this header for musical, Camelot and Open Key notations.
+    bool silence;            ///< If true, bpm and key detection is paused, because the analyzer detects a longer silence period (more than 1 seconds of digital silence or 8 seconds below -48 decibels). If false, bpm and key detection is under progress.
+    unsigned int samplerate; ///< Sample rate in Hz.
+
+/// Constructor.
+/// @param samplerate The initial sample rate in Hz.
+    LiveAnalyzer(unsigned int samplerate);
+    ~LiveAnalyzer();
+
+/// @brief Processes some audio. This method can be used in a real-time audio thread.
+/// @param input Pointer to floating point numbers. 32-bit interleaved stereo input.
+/// @param numberOfFrames Number of frames to process.
+    void process(float *input, unsigned int numberOfFrames);
+
+>>>>>>> master
 private:
     liveAnalyzerInternals *internals;
     SuperpoweredLiveAnalyzer(const SuperpoweredLiveAnalyzer&);
