@@ -35,6 +35,9 @@ typedef struct multiInputChannelMap {
 
 @protocol SuperpoweredIOSAudioIODelegate;
 
+// For calling back to the audio service after a system callback reinitializes the audio unit
+typedef void (*resetCallback)(void);
+
 /// @brief You can have an audio processing callback in Objective-C or pure C. This is the pure C prototype.
 /// @return Return false when you did no audio processing (silence).
 /// @param clientdata A custom pointer your callback receives.
