@@ -34,16 +34,7 @@ static bool audioProcessing (
 // StartAudio - Start audio engine and initialize player.
 extern "C" JNIEXPORT void
 Java_com_superpowered_playerexample_MainActivity_NativeInit(JNIEnv *env, jobject __unused obj, jint samplerate, jint buffersize, jstring tempPath) {
-    Superpowered::Initialize(
-            "ExampleLicenseKey-WillExpire-OnNextUpdate",
-            false, // enableAudioAnalysis (using SuperpoweredAnalyzer, SuperpoweredLiveAnalyzer, SuperpoweredWaveform or SuperpoweredBandpassFilterbank)
-            false, // enableFFTAndFrequencyDomain (using SuperpoweredFrequencyDomain, SuperpoweredFFTComplex, SuperpoweredFFTReal or SuperpoweredPolarFFT)
-            false, // enableAudioTimeStretching (using SuperpoweredTimeStretching)
-            false, // enableAudioEffects (using any SuperpoweredFX class)
-            true,  // enableAudioPlayerAndDecoder (using SuperpoweredAdvancedAudioPlayer or SuperpoweredDecoder)
-            false, // enableCryptographics (using Superpowered::RSAPublicKey, Superpowered::RSAPrivateKey, Superpowered::hasher or Superpowered::AES)
-            false  // enableNetworking (using Superpowered::httpRequest)
-    );
+    Superpowered::Initialize("ExampleLicenseKey-WillExpire-OnNextUpdate");
 
     // setting the temp folder for progressive downloads or HLS playback
     // not needed for local file playback
@@ -88,18 +79,18 @@ Java_com_superpowered_playerexample_MainActivity_OpenFileFromAPK (
 extern "C" JNIEXPORT jboolean
 Java_com_superpowered_playerexample_MainActivity_onUserInterfaceUpdate(JNIEnv * __unused env, jobject __unused obj) {
     switch (player->getLatestEvent()) {
-        case Superpowered::PlayerEvent_None:
-        case Superpowered::PlayerEvent_Opening: break; // do nothing
-        case Superpowered::PlayerEvent_Opened: player->play(); break;
-        case Superpowered::PlayerEvent_OpenFailed:
+        case Superpowered::AdvancedAudioPlayer::PlayerEvent_None:
+        case Superpowered::AdvancedAudioPlayer::PlayerEvent_Opening: break; // do nothing
+        case Superpowered::AdvancedAudioPlayer::PlayerEvent_Opened: player->play(); break;
+        case Superpowered::AdvancedAudioPlayer::PlayerEvent_OpenFailed:
         {
             int openError = player->getOpenErrorCode();
             log_print(ANDROID_LOG_ERROR, "PlayerExample", "Open error %i: %s", openError, Superpowered::AdvancedAudioPlayer::statusCodeToString(openError));
         }
             break;
-        case Superpowered::PlayerEvent_ConnectionLost:
+        case Superpowered::AdvancedAudioPlayer::PlayerEvent_ConnectionLost:
             log_print(ANDROID_LOG_ERROR, "PlayerExample", "Network download failed."); break;
-        case Superpowered::PlayerEvent_ProgressiveDownloadFinished:
+        case Superpowered::AdvancedAudioPlayer::PlayerEvent_ProgressiveDownloadFinished:
             log_print(ANDROID_LOG_ERROR, "PlayerExample", "Download finished. Path: %s", player->getFullyDownloadedFilePath()); break;
     }
 

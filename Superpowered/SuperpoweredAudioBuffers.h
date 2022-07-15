@@ -37,12 +37,12 @@ private:
     AudiobufferPool& operator=(const AudiobufferPool&);
 };
 
-/// @brief An audio buffer list item.
+/// @brief An audio buffer list item, inside an AudiopointerList.
 typedef struct AudiopointerlistElement {
     void *buffers[4];       ///< The buffers, coming from Superpowered AudiobufferPool.
     int firstFrame;         ///< The index of the first frame in the buffer.
     int lastFrame;          ///< The index of last frame in the buffer. The length of the buffer: lastFrame - firstFrame.
-    int64_t positionFrames; ///< Can be used to track position information.
+    int positionFrames;     ///< Can be used to track position information.
     float framesUsed;       ///< Can be used to track how many "original" frames were used to create this chunk of audio. Useful for time-stretching or resampling to precisely track the movement of the playhead.
 } AudiopointerlistElement;
 
@@ -58,10 +58,12 @@ public:
     
 /// @brief Append a buffer to the end of the list. The list will increase the retain count of the buffer by 1, similar to Objective-C.
 /// Not safe to use in a real-time thread, because it may use blocking memory operations.
+/// @param buffer The buffer to append.
     void append(AudiopointerlistElement *buffer);
 
 /// @brief Insert a buffer before the beginning of the list. The list will increase the retain count of the buffer by 1, similar to Objective-C.
 /// Not safe to use in a real-time thread, because it may use blocking memory operations.
+/// @param buffer The buffer to insert.
     void insert(AudiopointerlistElement *buffer);
         
 /// @brief Append all buffers to another buffer list. The anotherList will increase the retain count of all buffers by 1.
@@ -87,16 +89,17 @@ public:
     
 /// @brief Returns the start position in an audio file or stream.
 /// Safe to use in a real-time thread.
-    int64_t getPositionFrames();
+    int getPositionFrames();
     
 /// @brief Returns the end position in an audio file or stream, plus 1.
 /// Safe to use in a real-time thread.
-    int64_t getNextPositionFrames();
+    int getNextPositionFrames();
     
 /// @brief Creates a "virtual slice" from this list.
 /// Safe to use in a real-time thread.
 /// @param fromFrame The slice will start from this frame.
 /// @param lengthFrames The slice will contain this number of frames.
+/// @return True if succeeded, false if could not provide a slice with these arguments.
     bool makeSlice(int fromFrame, int lengthFrames);
 
 /// @return This the slice's forward enumerator method to go through all buffers in it. Returns a pointer to the audio, or NULL.
@@ -123,7 +126,7 @@ public:
     
 /// @brief Returns the slice start position in an audio file or stream.
 /// Safe to use in a real-time thread.
-    int64_t getSlicePositionFrames();
+    int getSlicePositionFrames();
     
 private:
     pointerListInternals *internals;

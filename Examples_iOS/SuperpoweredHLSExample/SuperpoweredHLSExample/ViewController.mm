@@ -30,16 +30,7 @@ static const char *urls[8] = {
         if (@available(iOS 13, *)) self.overrideUserInterfaceStyle = UIUserInterfaceStyleLight;
     #endif
     
-    Superpowered::Initialize(
-                             "ExampleLicenseKey-WillExpire-OnNextUpdate",
-                             false, // enableAudioAnalysis (using SuperpoweredAnalyzer, SuperpoweredLiveAnalyzer, SuperpoweredWaveform or SuperpoweredBandpassFilterbank)
-                             false, // enableFFTAndFrequencyDomain (using SuperpoweredFrequencyDomain, SuperpoweredFFTComplex, SuperpoweredFFTReal or SuperpoweredPolarFFT)
-                             false, // enableAudioTimeStretching (using SuperpoweredTimeStretching)
-                             false, // enableAudioEffects (using any SuperpoweredFX class)
-                             true, // enableAudioPlayerAndDecoder (using SuperpoweredAdvancedAudioPlayer or SuperpoweredDecoder)
-                             false, // enableCryptographics (using Superpowered::RSAPublicKey, Superpowered::RSAPrivateKey, Superpowered::hasher or Superpowered::AES)
-                             false  // enableNetworking (using Superpowered::httpRequest)
-                             );
+    Superpowered::Initialize("ExampleLicenseKey-WillExpire-OnNextUpdate");
     
     Superpowered::AdvancedAudioPlayer::setTempFolder([NSTemporaryDirectory() fileSystemRepresentation]);
     player = new Superpowered::AdvancedAudioPlayer(44100, 0);
@@ -53,7 +44,7 @@ static const char *urls[8] = {
     [self.view insertSubview:bufferIndicator belowSubview:seekSlider];
 
     displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(onDisplayLink)];
-    displayLink.frameInterval = 1;
+    displayLink.preferredFramesPerSecond = 60;
     [displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
 
     audioIO = [[SuperpoweredIOSAudioIO alloc] initWithDelegate:(id<SuperpoweredIOSAudioIODelegate>)self preferredBufferSize:12 preferredSamplerate:44100 audioSessionCategory:AVAudioSessionCategoryPlayback channels:2 audioProcessingCallback:audioProcessing clientdata:(__bridge void *)self];
@@ -68,17 +59,15 @@ static const char *urls[8] = {
     audioIO = nil;
     bufferIndicator = nil;
     delete player;
-    Superpowered::AdvancedAudioPlayer::clearTempFolder();
+    Superpowered::AdvancedAudioPlayer::setTempFolder(NULL);
 }
 
 // Called periodically by the operating system's audio stack to provide audio output.
-static bool audioProcessing(void *clientdata, float **inputBuffers, unsigned int inputChannels, float **outputBuffers, unsigned int outputChannels, unsigned int numberOfFrames, unsigned int samplerate, uint64_t hostTime) {
+static bool audioProcessing(void *clientdata, float *input, float *output, unsigned int numberOfFrames, unsigned int samplerate, uint64_t hostTime) {
     __unsafe_unretained ViewController *self = (__bridge ViewController *)clientdata;
     self->player->outputSamplerate = samplerate;
     
-    float interleavedBuffer[numberOfFrames * 2];
-    bool notSilence = self->player->processStereo(interleavedBuffer, false, numberOfFrames);
-    if (notSilence) Superpowered::DeInterleave(interleavedBuffer, outputBuffers[0], outputBuffers[1], numberOfFrames);
+    bool notSilence = self->player->processStereo(output, false, numberOfFrames);
     return notSilence;
 }
 
@@ -86,10 +75,10 @@ static bool audioProcessing(void *clientdata, float **inputBuffers, unsigned int
 - (void)onDisplayLink {
     // Check player events.
     switch (player->getLatestEvent()) {
-        case Superpowered::PlayerEvent_Opened:
+        case Superpowered::AdvancedAudioPlayer::PlayerEvent_Opened:
             player->play();
             break;
-        case Superpowered::PlayerEvent_OpenFailed:
+        case Superpowered::AdvancedAudioPlayer::PlayerEvent_OpenFailed:
             NSLog(@"Open error %i: %s", player->getOpenErrorCode(), Superpowered::AdvancedAudioPlayer::statusCodeToString(player->getOpenErrorCode()));
             break;
         default:;

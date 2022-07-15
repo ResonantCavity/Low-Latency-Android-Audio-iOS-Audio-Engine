@@ -18,21 +18,11 @@
 #ifdef __IPHONE_13_0
     if (@available(iOS 13, *)) self.overrideUserInterfaceStyle = UIUserInterfaceStyleLight;
 #endif
-    
-    Superpowered::Initialize(
-                             "ExampleLicenseKey-WillExpire-OnNextUpdate",
-                             true, // enableAudioAnalysis (using SuperpoweredAnalyzer, SuperpoweredLiveAnalyzer, SuperpoweredWaveform or SuperpoweredBandpassFilterbank)
-                             false, // enableFFTAndFrequencyDomain (using SuperpoweredFrequencyDomain, SuperpoweredFFTComplex, SuperpoweredFFTReal or SuperpoweredPolarFFT)
-                             true, // enableAudioTimeStretching (using SuperpoweredTimeStretching)
-                             true, // enableAudioEffects (using any SuperpoweredFX class)
-                             true, // enableAudioPlayerAndDecoder (using SuperpoweredAdvancedAudioPlayer or SuperpoweredDecoder)
-                             false, // enableCryptographics (using Superpowered::RSAPublicKey, Superpowered::RSAPrivateKey, Superpowered::hasher or Superpowered::AES)
-                             false  // enableNetworking (using Superpowered::httpRequest)
-                             );
+    Superpowered::Initialize("ExampleLicenseKey-WillExpire-OnNextUpdate");
     
     progress = 0.0f;
     displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(onDisplayLink)];
-    displayLink.frameInterval = 1;
+    displayLink.preferredFramesPerSecond = 60;
     [self displayMediaPicker];
 }
 
@@ -107,7 +97,7 @@ static FILE *createDestinationFile(const char *filename, unsigned int samplerate
     }
 
     // Create the low-pass filter.
-    Superpowered::Filter *filter = new Superpowered::Filter(Superpowered::Resonant_Lowpass, decoder->getSamplerate());
+    Superpowered::Filter *filter = new Superpowered::Filter(Superpowered::Filter::Resonant_Lowpass, decoder->getSamplerate());
     filter->frequency = 1000.0f;
     filter->resonance = 0.1f;
     filter->enabled = true;

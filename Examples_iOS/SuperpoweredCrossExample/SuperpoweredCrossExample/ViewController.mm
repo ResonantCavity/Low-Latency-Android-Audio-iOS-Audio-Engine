@@ -12,7 +12,7 @@ static const float headroom = powf(10.0f, -HEADROOM_DECIBEL * 0.05);
 
 // This is a .mm file, meaning it's Objective-C++. You can perfectly mix it with Objective-C or Swift, until you keep the member variables and C++ related includes here.
 @implementation ViewController {
-    SuperpoweredIOSAudioIO *output;
+    SuperpoweredIOSAudioIO *outputIO;
     Superpowered::AdvancedAudioPlayer *playerA, *playerB;
     Superpowered::Roll *roll;
     Superpowered::Filter *filter;
@@ -21,18 +21,18 @@ static const float headroom = powf(10.0f, -HEADROOM_DECIBEL * 0.05);
     unsigned int activeFx, numPlayersLoaded;
 }
 
-static bool audioProcessing(void *clientdata, float **inputBuffers, unsigned int inputChannels, float **outputBuffers, unsigned int outputChannels, unsigned int numberOfFrames, unsigned int samplerate, uint64_t hostTime) {
+static bool audioProcessing(void *clientdata, float *input, float *output, unsigned int numberOfFrames, unsigned int samplerate, uint64_t hostTime) {
     __unsafe_unretained ViewController *self = (__bridge ViewController *)clientdata;
-    return [self audioProcessing:outputBuffers[0] right:outputBuffers[1] numFrames:numberOfFrames samplerate:samplerate];
+    return [self audioProcessing:output numFrames:numberOfFrames samplerate:samplerate];
 }
 
 // This is where the Superpowered magic happens.
-- (bool)audioProcessing:(float *)leftOutput right:(float *)rightOutput numFrames:(unsigned int)numberOfFrames samplerate:(unsigned int)samplerate {
+- (bool)audioProcessing:(float *)output numFrames:(unsigned int)numberOfFrames samplerate:(unsigned int)samplerate {
     playerA->outputSamplerate = playerB->outputSamplerate = roll->samplerate = filter->samplerate = flanger->samplerate = samplerate;
     
     // Check player statuses. We're only interested in the Opened event in this example.
-    if (playerA->getLatestEvent() == Superpowered::PlayerEvent_Opened) numPlayersLoaded++;
-    if (playerB->getLatestEvent() == Superpowered::PlayerEvent_Opened) numPlayersLoaded++;
+    if (playerA->getLatestEvent() == Superpowered::AdvancedAudioPlayer::PlayerEvent_Opened) numPlayersLoaded++;
+    if (playerB->getLatestEvent() == Superpowered::AdvancedAudioPlayer::PlayerEvent_Opened) numPlayersLoaded++;
     
     // Both players opened? If yes, set the beatgrid information on the players.
     if (numPlayersLoaded == 2) {
@@ -40,7 +40,7 @@ static bool audioProcessing(void *clientdata, float **inputBuffers, unsigned int
         playerA->firstBeatMs = 353;
         playerB->originalBPM = 123.0f;
         playerB->firstBeatMs = 40;
-        playerA->syncMode = playerB->syncMode = Superpowered::SyncMode_TempoAndBeat;
+        playerA->syncMode = playerB->syncMode = Superpowered::AdvancedAudioPlayer::SyncMode_TempoAndBeat;
         // Jump to the first beat.
         playerA->setPosition(playerA->firstBeatMs, false, false);
         playerB->setPosition(playerB->firstBeatMs, false, false);
@@ -59,19 +59,16 @@ static bool audioProcessing(void *clientdata, float **inputBuffers, unsigned int
     playerB->syncToMsElapsedSinceLastBeat = playerA->getMsElapsedSinceLastBeat();
     
     // Get audio from the players into a buffer on the stack.
-    float outputBuffer[numberOfFrames * 2];
-    bool silence = !playerA->processStereo(outputBuffer, false, numberOfFrames, volA);
-    if (playerB->processStereo(outputBuffer, !silence, numberOfFrames, volB)) silence = false;
+    bool silence = !playerA->processStereo(output, false, numberOfFrames, volA);
+    if (playerB->processStereo(output, !silence, numberOfFrames, volB)) silence = false;
     
     // Add effects.
-    if (roll->process(silence ? NULL : outputBuffer, outputBuffer, numberOfFrames) && silence) silence = false;
+    if (roll->process(silence ? NULL : output, output, numberOfFrames) && silence) silence = false;
     if (!silence) {
-        filter->process(outputBuffer, outputBuffer, numberOfFrames);
-        flanger->process(outputBuffer, outputBuffer, numberOfFrames);
+        filter->process(output, output, numberOfFrames);
+        flanger->process(output, output, numberOfFrames);
     };
     
-    // The output buffer is ready now, let's put the finished audio into the left and right outputs.
-    if (!silence) Superpowered::DeInterleave(outputBuffer, leftOutput, rightOutput, numberOfFrames);
     return !silence;
 }
 
@@ -84,36 +81,27 @@ static bool audioProcessing(void *clientdata, float **inputBuffers, unsigned int
     crossFaderPosition = volB = 0.0f;
     volA = 1.0f * headroom;
     
-    Superpowered::Initialize(
-                             "ExampleLicenseKey-WillExpire-OnNextUpdate",
-                             false, // enableAudioAnalysis (using SuperpoweredAnalyzer, SuperpoweredLiveAnalyzer, SuperpoweredWaveform or SuperpoweredBandpassFilterbank)
-                             false, // enableFFTAndFrequencyDomain (using SuperpoweredFrequencyDomain, SuperpoweredFFTComplex, SuperpoweredFFTReal or SuperpoweredPolarFFT)
-                             false, // enableAudioTimeStretching (using SuperpoweredTimeStretching)
-                             true, // enableAudioEffects (using any SuperpoweredFX class)
-                             true, // enableAudioPlayerAndDecoder (using SuperpoweredAdvancedAudioPlayer or SuperpoweredDecoder)
-                             false, // enableCryptographics (using Superpowered::RSAPublicKey, Superpowered::RSAPrivateKey, Superpowered::hasher or Superpowered::AES)
-                             false  // enableNetworking (using Superpowered::httpRequest)
-                             );
+    Superpowered::Initialize("ExampleLicenseKey-WillExpire-OnNextUpdate");
 
     playerA = new Superpowered::AdvancedAudioPlayer(44100, 0);
     playerB = new Superpowered::AdvancedAudioPlayer(44100, 0);
     roll = new Superpowered::Roll(44100);
-    filter = new Superpowered::Filter(Superpowered::Resonant_Lowpass, 44100);
+    filter = new Superpowered::Filter(Superpowered::Filter::Resonant_Lowpass, 44100);
     flanger = new Superpowered::Flanger(44100);
     
     filter->resonance = 0.1f;
     playerA->open([[[NSBundle mainBundle] pathForResource:@"lycka" ofType:@"mp3"] fileSystemRepresentation]);
     playerB->open([[[NSBundle mainBundle] pathForResource:@"nuyorica" ofType:@"m4a"] fileSystemRepresentation]);
 
-    output = [[SuperpoweredIOSAudioIO alloc] initWithDelegate:(id<SuperpoweredIOSAudioIODelegate>)self preferredBufferSize:12 preferredSamplerate:44100 audioSessionCategory:AVAudioSessionCategoryPlayback channels:2 audioProcessingCallback:audioProcessing clientdata:(__bridge void *)self];
-    [output start];
+    outputIO = [[SuperpoweredIOSAudioIO alloc] initWithDelegate:(id<SuperpoweredIOSAudioIODelegate>)self preferredBufferSize:12 preferredSamplerate:44100 audioSessionCategory:AVAudioSessionCategoryPlayback channels:2 audioProcessingCallback:audioProcessing clientdata:(__bridge void *)self];
+    [outputIO start];
 }
 
 - (void)dealloc {
     delete playerA;
     delete playerB;
 #if !__has_feature(objc_arc)
-    [output release];
+    [outputIO release];
     [super dealloc];
 #endif
 }

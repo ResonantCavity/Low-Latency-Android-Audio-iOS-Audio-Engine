@@ -7,8 +7,6 @@
 #include <SuperpoweredRecorder.h>
 #include <unistd.h>
 
-#define log_write __android_log_write
-
 static SuperpoweredAndroidAudioIO *audioIO;
 static Superpowered::Recorder *recorder;
 
@@ -19,50 +17,43 @@ static bool audioProcessing (
         int numberOfFrames,         // number of frames to process
         int __unused samplerate     // current sample rate in Hz
 ) {
+    {
+        static int test = 0;
+        test += numberOfFrames;
+        if (test >= 48000) {
+            test = 0;
+            __android_log_print(ANDROID_LOG_VERBOSE, "Superpowered", "record");
+        }
+    }
     float floatBuffer[numberOfFrames * 2];
     Superpowered::ShortIntToFloat(audio, floatBuffer, (unsigned int)numberOfFrames);
     recorder->recordInterleaved(floatBuffer, (unsigned int)numberOfFrames);
-    return false;
+    return true;
 }
 
 // StartAudio - Start audio engine.
 extern "C" JNIEXPORT void
-Java_com_superpowered_recorder_MainActivity_StartAudio (
-        JNIEnv *env,
+Java_com_superpowered_recorder_RecorderService_StartAudio (
+        JNIEnv * __unused env,
         jobject  __unused obj,
         jint samplerate,
         jint buffersize,
-        jstring tempPath,       // path to a temporary file
-        jstring destPath        // path to the destination file
+        jint destinationfd // file descriptor of the destination file
 ) {
-    Superpowered::Initialize(
-            "ExampleLicenseKey-WillExpire-OnNextUpdate",
-            false, // enableAudioAnalysis (using SuperpoweredAnalyzer, SuperpoweredLiveAnalyzer, SuperpoweredWaveform or SuperpoweredBandpassFilterbank)
-            false, // enableFFTAndFrequencyDomain (using SuperpoweredFrequencyDomain, SuperpoweredFFTComplex, SuperpoweredFFTReal or SuperpoweredPolarFFT)
-            false, // enableAudioTimeStretching (using SuperpoweredTimeStretching)
-            false, // enableAudioEffects (using any SuperpoweredFX class)
-            false, // enableAudioPlayerAndDecoder (using SuperpoweredAdvancedAudioPlayer or SuperpoweredDecoder)
-            false, // enableCryptographics (using Superpowered::RSAPublicKey, Superpowered::RSAPrivateKey, Superpowered::hasher or Superpowered::AES)
-            false  // enableNetworking (using Superpowered::httpRequest)
-    );
+    Superpowered::Initialize("ExampleLicenseKey-WillExpire-OnNextUpdate");
 
-    // Get path strings.
-    const char *temp = env->GetStringUTFChars(tempPath, 0);
-    const char *dest = env->GetStringUTFChars(destPath, 0);
+    // Initialize the recorder.
+    recorder = new Superpowered::Recorder(NULL);
 
-    // Initialize the recorder with a temporary file path.
-    recorder = new Superpowered::Recorder(temp);
     // Start a new recording.
-    recorder->prepare(
-            dest,                     // destination path
+    recorder->preparefd(
+            destinationfd,            // destination file descriptor
+            0,                        // not used
             (unsigned int)samplerate, // sample rate in Hz
             true,                     // apply fade in/fade out
             1                         // minimum length of the recording in seconds
             );
 
-    // Release path strings.
-    env->ReleaseStringUTFChars(tempPath, temp);
-    env->ReleaseStringUTFChars(destPath, dest);
 
     // Initialize audio engine with audio callback function.
     audioIO = new SuperpoweredAndroidAudioIO (
@@ -77,7 +68,7 @@ Java_com_superpowered_recorder_MainActivity_StartAudio (
 
 // StopAudio - Stop audio engine and free audio buffer.
 extern "C" JNIEXPORT void
-Java_com_superpowered_recorder_MainActivity_StopRecording(JNIEnv * __unused env, jobject __unused obj) {
+Java_com_superpowered_recorder_RecorderService_StopRecording(JNIEnv * __unused env, jobject __unused obj) {
     recorder->stop();
     delete audioIO;
 
@@ -85,18 +76,6 @@ Java_com_superpowered_recorder_MainActivity_StopRecording(JNIEnv * __unused env,
     // It's better to do this asynchronously, but we're just blocking (sleeping) now.
     while (!recorder->isFinished()) usleep(100000);
 
-    log_write(ANDROID_LOG_DEBUG, "RecorderExample", "Finished recording.");
+    __android_log_print(ANDROID_LOG_DEBUG, "Recorder", "Finished recording.");
     delete recorder;
-}
-
-// onBackground - Put audio processing to sleep if no audio is playing.
-extern "C" JNIEXPORT void
-Java_com_superpowered_recorder_MainActivity_onBackground(JNIEnv * __unused env, jobject __unused obj) {
-    audioIO->onBackground();
-}
-
-// onForeground - Resume audio processing.
-extern "C" JNIEXPORT void
-Java_com_superpowered_recorder_MainActivity_onForeground(JNIEnv * __unused env, jobject __unused obj) {
-    audioIO->onForeground();
 }
