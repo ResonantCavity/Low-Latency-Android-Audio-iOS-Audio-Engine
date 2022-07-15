@@ -299,10 +299,8 @@
 		1B468B791AE663D20099A7DD /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = J8BBCCM5Z8;
-				INFOPLIST_FILE = SuperpoweredFrequencyDomain/Info.plist;
+				DEVELOPMENT_TEAM = AP4SQ5L535;
+				INFOPLIST_FILE = SuperpoweredFrequencyDomain/etc/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
@@ -316,10 +314,8 @@
 		1B468B7A1AE663D20099A7DD /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = J8BBCCM5Z8;
-				INFOPLIST_FILE = SuperpoweredFrequencyDomain/Info.plist;
+				DEVELOPMENT_TEAM = AP4SQ5L535;
+				INFOPLIST_FILE = SuperpoweredFrequencyDomain/etc/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
