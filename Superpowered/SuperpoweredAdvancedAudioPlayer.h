@@ -55,7 +55,8 @@ public:
         PlayerEvent_OpenFailed = 2, ///< Failed to open the content.
         PlayerEvent_Opened = 10,    ///< Successfully opened the content, playback can start.
         PlayerEvent_ConnectionLost = 3, ///< Network connection lost to the HLS stream or progressive download. Can only be "recovered" by a new open(). May happen after PlayerEvent_Opened has been delivered.
-        PlayerEvent_ProgressiveDownloadFinished = 11 ///< The content has finished downloading and is fully available locally. May happen after PlayerEvent_Opened has been delivered.
+        PlayerEvent_ProgressiveDownloadFinished = 11, ///< The content has finished downloading and is fully available locally. May happen after PlayerEvent_Opened has been delivered.
+        PlayerEvent_EOF = 12
     } PlayerEvent;
     
     /// @brief Synchronization modes.
