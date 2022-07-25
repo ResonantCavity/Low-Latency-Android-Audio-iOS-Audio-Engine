@@ -6,6 +6,7 @@
 #include <mach/mach_time.h>
 
 #define USES_AUDIO_INPUT 1
+#define ALLOW_BLUETOOTH 1
 
 typedef enum audioDeviceType {
     audioDeviceType_USB = 1, audioDeviceType_headphone = 2, audioDeviceType_HDMI = 3, audioDeviceType_other = 4
@@ -96,7 +97,7 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
         externalAudioDeviceName = nil;
         audioUnit = NULL;
         inputBuffer = NULL;
-        
+
 #if (USES_AUDIO_INPUT == 1)
         if (inputEnabled) [self createInputBuffer];
 #endif
@@ -112,7 +113,7 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onMediaServerReset:) name:AVAudioSessionMediaServicesWereResetNotification object:[AVAudioSession sharedInstance]];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onAudioSessionInterrupted:) name:AVAudioSessionInterruptionNotification object:[AVAudioSession sharedInstance]];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onRouteChange:) name:AVAudioSessionRouteChangeNotification object:[AVAudioSession sharedInstance]];
-        
+
 #if (USES_AUDIO_INPUT == 1)
         if ((recordOnly || [category isEqualToString:AVAudioSessionCategoryPlayAndRecord]) && [[AVAudioSession sharedInstance] respondsToSelector:@selector(recordPermission)] && [[AVAudioSession sharedInstance] respondsToSelector:@selector(requestRecordPermission:)] && ([[AVAudioSession sharedInstance] recordPermission] != AVAudioSessionRecordPermissionGranted)) {
             [[AVAudioSession sharedInstance] requestRecordPermission:^(BOOL granted) {
@@ -243,7 +244,7 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
         [self performSelectorOnMainThread:@selector(onRouteChange:) withObject:notification waitUntilDone:NO];
         return;
     };
-    
+
     bool receiverAvailable = false, usbOrHDMIAvailable = false;
     for (AVAudioSessionPortDescription *port in [[[AVAudioSession sharedInstance] currentRoute] outputs]) {
         if ([port.portType isEqualToString:AVAudioSessionPortUSBAudio] || [port.portType isEqualToString:AVAudioSessionPortHDMI]) {
@@ -252,11 +253,12 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
         } else if ([port.portType isEqualToString:AVAudioSessionPortBuiltInReceiver]) receiverAvailable = true;
     };
 
-    if (receiverAvailable && !usbOrHDMIAvailable) { // Comment this out if you would like to use the receiver instead.
-        [[AVAudioSession sharedInstance] overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:nil];
-        [self performSelectorOnMainThread:@selector(onRouteChange:) withObject:nil waitUntilDone:NO];
-        return;
-    };
+// COMMENTED OUT BY REZCAV TO SO WE DON'T HAVE TO MANAGE THIS CRAP. WISH THERE WAS AN API. OH WELL.
+    // if (receiverAvailable && !usbOrHDMIAvailable) { // Comment this out if you would like to use the receiver instead.
+    //     [[AVAudioSession sharedInstance] overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:nil];
+    //     [self performSelectorOnMainThread:@selector(onRouteChange:) withObject:nil waitUntilDone:NO];
+    //     return;
+    // };
 
     memset(RemoteIOOutputChannelMap, 0, sizeof(RemoteIOOutputChannelMap));
     outputChannelMap.headphoneAvailable = false;
@@ -275,7 +277,7 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
         audioDeviceType type = NSStringToAudioDeviceType(port.portType);
         [audioSystemInfo appendFormat:@"%s%@ (%i out)", first ? "" : ", ", [port.portName stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]], channels];
         first = false;
-        
+
         if (type == audioDeviceType_headphone) outputChannelMap.headphoneAvailable = true;
         else if (type == audioDeviceType_HDMI) {
             outputChannelMap.numberOfHDMIChannelsAvailable = channels;
@@ -294,7 +296,7 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
             externalAudioDeviceName = port.portName;
 #endif
         };
-        
+
         while (channels > 0) {
             RemoteIOOutputChannelMap[n++] = type;
             channels--;
@@ -304,7 +306,7 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
     if ([[AVAudioSession sharedInstance] isInputAvailable]) {
         [audioSystemInfo appendString:@", Inputs: "];
         first = true;
-        
+
         for (AVAudioSessionPortDescription *port in [[[AVAudioSession sharedInstance] currentRoute] inputs]) {
             int channels = (int)[port.channels count];
             audioDeviceType type = NSStringToAudioDeviceType(port.portType);
@@ -312,7 +314,7 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
             first = false;
             if (type == audioDeviceType_USB) inputChannelMap.numberOfUSBChannelsAvailable = channels;
         };
-        
+
         if (first) [audioSystemInfo appendString:@"-"];
     };
 
@@ -401,7 +403,7 @@ static void streamFormatChangedCallback(void *inRefCon, AudioUnit inUnit, AudioU
 static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
     __unsafe_unretained SuperpoweredIOSAudioIO *self = (__bridge SuperpoweredIOSAudioIO *)inRefCon;
     self->lastCallbackTime = mach_absolute_time();
-    
+
     if (!ioData) ioData = self->inputBuffer;
     div_t d = div(inNumberFrames, 8);
     if (d.rem != 0) {
@@ -436,7 +438,7 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
         // If the app is in the background, check if we don't output anything.
         if (self->background && self->saveBatteryInBackground) self->silenceFrames += inNumberFrames; else self->silenceFrames = 0;
     } else self->silenceFrames = 0;
-    
+
     return noErr;
 }
 
@@ -523,7 +525,7 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
     outputChannelMap.deviceChannels[0] = outputChannelMap.deviceChannels[1] = -1;
     for (int n = 0; n < 8; n++) outputChannelMap.HDMIChannels[n] = -1;
     for (int n = 0; n < 32; n++) outputChannelMap.USBChannels[n] = inputChannelMap.USBChannels[n] = - 1;
-    
+
     if ([(NSObject *)self->delegate respondsToSelector:@selector(mapChannels:inputMap:externalAudioDeviceName:outputsAndInputs:)]) [delegate mapChannels:&outputChannelMap inputMap:&inputChannelMap externalAudioDeviceName:externalAudioDeviceName outputsAndInputs:audioSystemInfo];
     if (!audioUnit || (numberOfChannels <= 2)) return;
 
@@ -538,7 +540,7 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
         } else outputmap[n] = -1;
         inputmap[n] = inputChannelMap.USBChannels[n];
     };
-    
+
 #if !TARGET_IPHONE_SIMULATOR
     AudioUnitSetProperty(audioUnit, kAudioOutputUnitProperty_ChannelMap, kAudioUnitScope_Output, 0, outputmap, 128);
     AudioUnitSetProperty(audioUnit, kAudioOutputUnitProperty_ChannelMap, kAudioUnitScope_Output, 1, inputmap, 128);
