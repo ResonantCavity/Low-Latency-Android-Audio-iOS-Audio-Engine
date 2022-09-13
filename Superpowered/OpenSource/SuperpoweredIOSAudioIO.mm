@@ -149,11 +149,14 @@ static audioDeviceType NSStringToAudioDeviceType(NSString *str) {
 - (void)onMediaServerReset:(NSNotification *)notification { // The mediaserver daemon can die. Yes, it happens sometimes.
     if (![NSThread isMainThread]) [self performSelectorOnMainThread:@selector(onMediaServerReset:) withObject:nil waitUntilDone:NO];
     else {
+        BOOL restart = audioUnitRunning;
         if (audioUnit) AudioOutputUnitStop(audioUnit);
         audioUnitRunning = false;
         [[AVAudioSession sharedInstance] setActive:NO error:nil];
         [self resetAudio];
-        [self start];
+        if (restart) {
+            [self start];
+        }
     };
 }
 
@@ -456,9 +459,9 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
 
     bool recordOnly = [audioSessionCategory isEqualToString:AVAudioSessionCategoryRecord];
     UInt32 value = recordOnly ? 0 : 1;
-	if (AudioUnitSetProperty(au, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Output, 0, &value, sizeof(value))) { AudioComponentInstanceDispose(au); return NULL; };
+    if (AudioUnitSetProperty(au, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Output, 0, &value, sizeof(value))) { AudioComponentInstanceDispose(au); return NULL; };
     value = inputEnabled ? 1 : 0;
-	if (AudioUnitSetProperty(au, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, 1, &value, sizeof(value))) { AudioComponentInstanceDispose(au); return NULL; };
+    if (AudioUnitSetProperty(au, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, 1, &value, sizeof(value))) { AudioComponentInstanceDispose(au); return NULL; };
 
     AudioUnitAddPropertyListener(au, kAudioUnitProperty_StreamFormat, streamFormatChangedCallback, (__bridge void *)self);
 
@@ -469,25 +472,25 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
 
     samplerate = (int)format.mSampleRate;
 
-	format.mFormatID = kAudioFormatLinearPCM;
+    format.mFormatID = kAudioFormatLinearPCM;
     format.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked | kAudioFormatFlagsNativeEndian;
     format.mBitsPerChannel = 32;
-	format.mFramesPerPacket = 1;
+    format.mFramesPerPacket = 1;
     format.mBytesPerFrame = format.mBytesPerPacket = numberOfChannels * 4;
     format.mChannelsPerFrame = numberOfChannels;
     if (AudioUnitSetProperty(au, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &format, sizeof(format))) { AudioComponentInstanceDispose(au); return NULL; };
     if (AudioUnitSetProperty(au, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, &format, sizeof(format))) { AudioComponentInstanceDispose(au); return NULL; };
 
-	AURenderCallbackStruct callbackStruct;
-	callbackStruct.inputProc = coreAudioProcessingCallback;
-	callbackStruct.inputProcRefCon = (__bridge void *)self;
+    AURenderCallbackStruct callbackStruct;
+    callbackStruct.inputProc = coreAudioProcessingCallback;
+    callbackStruct.inputProcRefCon = (__bridge void *)self;
     if (recordOnly) {
         if (AudioUnitSetProperty(au, kAudioOutputUnitProperty_SetInputCallback, kAudioUnitScope_Global, 0, &callbackStruct, sizeof(callbackStruct))) { AudioComponentInstanceDispose(au); return NULL; };
     } else {
         if (AudioUnitSetProperty(au, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &callbackStruct, sizeof(callbackStruct))) { AudioComponentInstanceDispose(au); return NULL; };
     };
 
-	if (AudioUnitInitialize(au)) { AudioComponentInstanceDispose(au); return NULL; };
+    if (AudioUnitInitialize(au)) { AudioComponentInstanceDispose(au); return NULL; };
     return au;
 }
 
