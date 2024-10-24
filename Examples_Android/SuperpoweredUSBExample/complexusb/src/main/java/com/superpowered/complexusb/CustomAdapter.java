@@ -1,6 +1,5 @@
 package com.superpowered.complexusb;
 
-import android.annotation.SuppressLint;
 import android.content.Context;
 import androidx.core.content.ContextCompat;
 import android.view.LayoutInflater;
@@ -8,6 +7,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
 import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.RelativeLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -19,7 +19,7 @@ import java.util.Locale;
 
 // This provides the data for the ListView.
 public class CustomAdapter extends BaseAdapter {
-    private static class ItemData {
+    private class ItemData {
         String text;
         CustomAdapterHandler handler;
         int kind;
@@ -42,7 +42,7 @@ public class CustomAdapter extends BaseAdapter {
         }
     }
 
-    private static class RowViewData {
+    private class RowViewData {
         SeekBar volumeControl;
         CheckBox muteControl;
         TextView textView;
@@ -59,10 +59,10 @@ public class CustomAdapter extends BaseAdapter {
     public static final int VOLUMEMUTEITEM = 7;
     public static final int LATENCYITEM = 8;
     public static final int ACTIONITEM = 9;
-    private final ArrayList<ItemData> data = new ArrayList<>();
-    private final LayoutInflater inflater;
-    private final int sectionHeaderBackgroundColor;
-    private final CustomAdapterHandler handler;
+    private ArrayList<ItemData> data = new ArrayList<>();
+    private LayoutInflater inflater;
+    private int sectionHeaderBackgroundColor;
+    private CustomAdapterHandler handler;
 
     public CustomAdapter(Context context) {
         handler = (CustomAdapterHandler)context;
@@ -142,7 +142,6 @@ public class CustomAdapter extends BaseAdapter {
         }
     }
 
-    @SuppressLint("InflateParams")
     public View getView(int position, View rowView, ViewGroup parent) {
         ItemData item = data.get(position);
         RowViewData viewData;
