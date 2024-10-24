@@ -14,14 +14,14 @@ import android.hardware.usb.UsbManager;
 // This class handles USB device permissions, attaching and detaching a device.
 public class SuperpoweredUSBAudio {
     private static final String ACTION_USB_PERMISSION = "com.superpowered.USBAudio.USB_PERMISSION";
-    private PendingIntent permissionIntent;
-    private Context context;
-    private SuperpoweredUSBAudioHandler handler;
+    private final PendingIntent permissionIntent;
+    private final Context context;
+    private final SuperpoweredUSBAudioHandler handler;
 
     public SuperpoweredUSBAudio(Context c, SuperpoweredUSBAudioHandler h) {
         context = c;
         handler = h;
-        permissionIntent = PendingIntent.getBroadcast(context, 0, new Intent(ACTION_USB_PERMISSION), 0);
+        permissionIntent = PendingIntent.getBroadcast(context, 0, new Intent(ACTION_USB_PERMISSION), PendingIntent.FLAG_MUTABLE);
 
         BroadcastReceiver usbReceiver = new BroadcastReceiver() {
             @Override
@@ -61,16 +61,23 @@ public class SuperpoweredUSBAudio {
     private void addUSBDevice(UsbDevice device) {
         UsbManager manager = (UsbManager)context.getSystemService(Context.USB_SERVICE);
         if (manager == null) return;
+
+        if (!manager.hasPermission(device)) {
+            manager.requestPermission(device, permissionIntent);
+            return;
+        }
+
         UsbDeviceConnection connection = manager.openDevice(device);
         if (connection != null) {
             int id = device.getDeviceId();
             switch (onConnect(id, connection.getFileDescriptor(), connection.getRawDescriptors())) {
-                case 1: if (handler != null) handler.onUSBAudioDeviceAttached(id); break; // Audio device.
-                case 2: if (handler != null) handler.onUSBMIDIDeviceAttached(id); break; // MIDI device.
-                case 3: // Audio and MIDI device.
+                case 0: // Audio and MIDI device.
                     if (handler != null) handler.onUSBAudioDeviceAttached(id);
                     if (handler != null) handler.onUSBMIDIDeviceAttached(id);
                     break;
+                case 1: if (handler != null) handler.onUSBAudioDeviceAttached(id); break; // Audio device.
+                case 2: if (handler != null) handler.onUSBMIDIDeviceAttached(id); break; // MIDI device.
+                case 3: break; // Found no audio or MIDI features for this device.
             }
         }
     }
