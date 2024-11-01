@@ -411,7 +411,7 @@ static void streamFormatChangedCallback(void *inRefCon, AudioUnit inUnit, AudioU
             int minimum = int(self->samplerate * 0.001f), maximum = int(self->samplerate * 0.025f);
             self->minimumNumberOfFrames = nearestPowerOfTwo(minimum / 8) * 8;
             self->maximumNumberOfFrames = nearestPowerOfTwo(maximum / 8) * 8;
-            if (self->maximumNumberOfFrames < 1024) self->maximumNumberOfFrames = 1024;
+            if (self->maximumNumberOfFrames < MAXFRAMES) self->maximumNumberOfFrames = MAXFRAMES;
             if (self->minimumNumberOfFrames < 16) self->minimumNumberOfFrames = 16;
             [self performSelectorOnMainThread:@selector(applyBuffersize) withObject:nil waitUntilDone:NO];
         }
