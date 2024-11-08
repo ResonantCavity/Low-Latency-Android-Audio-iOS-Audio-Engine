@@ -468,7 +468,7 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
     // Make audio output.
     silence = !self->processingCallback(self->processingClientdata, inputBuf, (float *)ioData->mBuffers[0].mData, inNumberFrames, self->samplerate, inTimeStamp->mHostTime, inputBufferStatusCode);
 
-    if (inputBufferStatusCode == 0) {
+    if (inputBufferStatusCode >= 0) {
         if (silence) { // Despite of ioActionFlags, it outputs garbage sometimes, so must zero the buffers:
             *ioActionFlags |= kAudioUnitRenderAction_OutputIsSilence;
             memset(ioData->mBuffers[0].mData, 0, inNumberFrames * sizeof(float) * self->numberOfChannels);
