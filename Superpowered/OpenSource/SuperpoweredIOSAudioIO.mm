@@ -438,24 +438,45 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
 
     // Get audio input.
     float *inputBuf = NULL;
+    int inputBufferStatusCode = 0;
     if (self->inputEnabled) {
         self->inputBuffer->mBuffers[0].mDataByteSize = MAXFRAMES * 4 * self->numberOfChannels;
         self->inputBuffer->mBuffers[0].mNumberChannels = self->numberOfChannels;
         self->inputBuffer->mNumberBuffers = 1;
-        if (!AudioUnitRender(self->audioUnit, ioActionFlags, inTimeStamp, 1, inNumberFrames, self->inputBuffer)) inputBuf = (float *)self->inputBuffer->mBuffers[0].mData;
+        
+        OSStatus result = AudioUnitRender(self->audioUnit, ioActionFlags, inTimeStamp, 1, inNumberFrames, self->inputBuffer);
+        
+        if (!result) {
+            // We have input!
+            inputBuf = (float *)self->inputBuffer->mBuffers[0].mData;
+            
+            // Check if inNumberFrames is weirdly large, like 1104 or 1120. If so, trigger the suggestion
+            // to disable Sound Recognition and Vocal Shortcuts, fire analytics event for scenario #1.
+            if (inNumberFrames > 1024 || inNumberFrames != nearestPowerOfTwo(inNumberFrames)) {
+                inputBufferStatusCode = 1;
+            }
+        } else {
+            // No input :/ This is the bad state--we don't have access to the mic. We need to surface this condition
+            // to the app layer and tell users they MUST disable Sound Recognition and Vocal Shorcuts,
+            // fire analytics event for scenario #2. Result is negative number.
+            inputBufferStatusCode = (int)result;
+        }
     }
+
     bool silence = true;
 
     // Make audio output.
-    silence = !self->processingCallback(self->processingClientdata, inputBuf, (float *)ioData->mBuffers[0].mData, inNumberFrames, self->samplerate, inTimeStamp->mHostTime);
+    silence = !self->processingCallback(self->processingClientdata, inputBuf, (float *)ioData->mBuffers[0].mData, inNumberFrames, self->samplerate, inTimeStamp->mHostTime, inputBufferStatusCode);
 
-    if (silence) { // Despite of ioActionFlags, it outputs garbage sometimes, so must zero the buffers:
-        *ioActionFlags |= kAudioUnitRenderAction_OutputIsSilence;
-        memset(ioData->mBuffers[0].mData, 0, inNumberFrames * sizeof(float) * self->numberOfChannels);
-
-        // If the app is in the background, check if we don't output anything.
-        if (self->background && self->saveBatteryInBackground) self->silenceFrames += inNumberFrames; else self->silenceFrames = 0;
-    } else self->silenceFrames = 0;
+    if (inputBufferStatusCode >= 0) {
+        if (silence) { // Despite of ioActionFlags, it outputs garbage sometimes, so must zero the buffers:
+            *ioActionFlags |= kAudioUnitRenderAction_OutputIsSilence;
+            memset(ioData->mBuffers[0].mData, 0, inNumberFrames * sizeof(float) * self->numberOfChannels);
+            
+            // If the app is in the background, check if we don't output anything.
+            if (self->background && self->saveBatteryInBackground) self->silenceFrames += inNumberFrames; else self->silenceFrames = 0;
+        } else self->silenceFrames = 0;
+    }
 
     return noErr;
 }

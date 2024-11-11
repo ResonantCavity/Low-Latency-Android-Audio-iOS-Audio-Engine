@@ -46,7 +46,7 @@ typedef void (*resetCallback)(void);
 /// @param numberOfFrames The number of frames requested.
 /// @param samplerate The current sample rate in Hz.
 /// @param hostTime A mach timestamp, indicates when this buffer of audio will be passed to the audio output.
-typedef bool (*audioProcessingCallback) (void *clientdata, float *inputBuffer, float *outputBuffer, unsigned int numberOfFrames, unsigned int samplerate, uint64_t hostTime);
+typedef bool (*audioProcessingCallback) (void *clientdata, float *inputBuffer, float *outputBuffer, unsigned int numberOfFrames, unsigned int samplerate, uint64_t hostTime, int inputBufferStatusCode);
 
 /// @brief Handles all audio session, audio lifecycle (interruptions), output, buffer size, samplerate and routing headaches.
 /// @warning All methods and setters should be called on the main thread only!
