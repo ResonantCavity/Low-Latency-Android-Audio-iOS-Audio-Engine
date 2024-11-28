@@ -11,6 +11,7 @@ Superpowered Inc develops the following interactive audio, networking and crypto
 Superpowered C++ Audio Library and SDK is the leading C++ Audio Library featuring low-power, real-time latency and cross-platform audio players, audio decoders, Fx (effects), audio I/O, streaming, music analysis and spatialization.
 
 For the most up-to-date feature list, see: https://superpowered.com/audio-library-sdk
+For the latest API reference check the docsite: https://docs.superpowered.com/reference/latest?lang=cpp
 
 ### 2. Superpowered C++ Networking Library and SDK for Android, iOS, macOS, tvOS, Linux and Windows.
 The Superpowered C++ Networking Library and SDK was designed from the ground-up to provide the easiest cross-platform way for a client to communicate with the back-end. It implements HTTP and HTTPS communication with custom data and header support, progress handling, file uploads/downloads and more. It reduces implementation, debug and maintenance time of typical tasks such as REST API requests, OAuth and bearer token authorization, or digital media streaming. It operates identically on all platforms, removing the pain of writing wrappers and finding quirks around the operating system's networking API, while it's fully self-contained and independent from it. The SDK also has a JSON parser to offer a complete package for your everyday networking and parsing needs.
@@ -83,6 +84,18 @@ Superpowered is cross-platform: ALL SUPERPOWERED C++ CODE CAN BE COPY-PASTED bet
 - /Examples_macOS
 
 	Ambisonics (b-format) implementation based on the Superpowered Spatializer.
+
+- /Examples_Flutter
+
+	Example projects for Flutter.
+
+- /Examples_ReactNative
+
+	Example projects for React Native.
+
+- /Examples_VisionOS
+
+	Example projects for visionOS.
 
 
 # Example Projects
@@ -171,6 +184,15 @@ If an audio output is selected without an audio input, the complex example sends
 
 This means that the complex example app is also a testing tool to discover a USB audio device’s advanced features, test audio quality, glitches and latency.
 
+#### /Examples_Flutter/SuperpoweredPlayerWithEffects
+Shows how to use a player and apply a single effect.
+
+#### /Examples_ReactNative/SuperpoweredPlayerWithEffects
+Shows how to use a player and apply a single effect.
+
+#### /Examples_VisionOS/SuperpoweredVisionOSExample
+Shows how to generate a sine wave.
+
 ###### Remarks:
 
 Superpowered USB Audio classes for Android are compatible from Android 19 (KitKat 4.4) onwards. That’s the first Android version where proper scheduling priorities were implemented for low latency audio. This covers more than 75% active Android devices today.
@@ -178,7 +200,7 @@ Superpowered USB Audio classes for Android are compatible from Android 19 (KitKa
 
 # Android Studio
 
-Before running any Android example project, please set up the appropriate Android SDK and NDK paths in File - Project Structure... Furthermore, turn off Instant Run in the settings, because the Instant Run feature of Android Studio is not compatible with native C++ Android projects.
+Before running any Android example project, please install the Android NDK version 25.1.8937393 (Tools → SDK Manager → SDK Tools → NDK (Side by side)). Furthermore, turn off Instant Run in the settings, because the Instant Run feature of Android Studio is not compatible with native C++ Android projects.
 
 
 # How to create a Superpowered project with Android Studio
@@ -235,4 +257,4 @@ Superpowered FFT benefits from ideas in Construction of a High-Performance FFT b
 
 The Superpowered MP3 and AAC decoder benefits from optimizations by Ken Cooke.
 
-Superpowered version 2.5.1
+Superpowered version 2.7.2

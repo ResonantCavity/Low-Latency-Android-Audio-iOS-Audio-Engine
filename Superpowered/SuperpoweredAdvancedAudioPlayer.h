@@ -27,7 +27,6 @@ struct PlayerInternals;
 /// - low memory usage,
 /// - thread safety (all methods are thread-safe),
 /// - direct iPod music library access.
-/// Can be used in a real-time audio processing thread. Can not be used for offline processing.
 /// Supported file types:
 /// - Stereo or mono pcm WAV and AIFF (16-bit int, 24-bit int, 32-bit int or 32-bit IEEE float).
 /// - MP3: MPEG-1 Layer III (sample rates: 32000 Hz, 44100 Hz, 48000 Hz). MPEG-2 Layer III is not supported (mp3 with sample rates below 32000 Hz).
@@ -105,7 +104,7 @@ public:
 /// @brief Creates a player instance.
 /// @param samplerate The initial sample rate of the player output in hz.
 /// @param cachedPointCount How many positions can be cached in the memory. Jumping to a cached point happens with zero latency. Loops are automatically cached.
-/// @param internalBufferSizeSeconds The number of seconds to buffer internally for playback and cached points. Minimum 2, maximum 60. Default: 2.
+/// @param internalBufferSizeSeconds The number of seconds to buffer internally for playback and cached points. The value 0 enables "offline mode", where the player can not be used for real-time playback, but can process audio in an iteration. If not zero, the AdvancedAudioPlayer can only be used for real-time playback. Default: 2.
 /// @param negativeSeconds The number of seconds of silence in the negative direction, before the beginning of the track.
 /// @param minimumTimestretchingPlaybackRate Will not time-stretch but resample below this playback rate. Default: 0.501f (the recommended value for low CPU load on older mobile devices, such as the first iPad). Will be applied after changing playbackRate or scratching. Default: 0.501f
 /// @param maximumTimestretchingPlaybackRate Will not time-stretch but resample above this playback rate. Default: 2.0f (the recommended value for low CPU load on older mobile devices, such as the first iPad). Will be applied after changing playbackRate or scratching.
@@ -194,8 +193,8 @@ public:
 /// @return The position in milliseconds where the player will continue playback after slip mode ends.
     JSWASM double afterSlipModeWillJumpBackToPositionMs();
 
-/// @return The duration of the current track in milliseconds. Returns UINT_MAX for live streams.
-    JSWASM unsigned int getDurationMs();
+/// @return The duration of the current track in milliseconds. Returns -1 for live streams.
+    JSWASM double getDurationMs();
 
 /// @return The duration of the current track in seconds. Returns UINT_MAX for live streams.
     JSWASM unsigned int getDurationSeconds();
@@ -372,16 +371,16 @@ public:
 /// @return If true, the player is playing backwards.
     JSWASM bool isReverse();
 
-/// @brief Starts on changes pitch bend (temporary playback rate change).
+/// @brief Starts or changes pitch bend (temporary playback rate change).
 /// @param maxPercent The maximum playback rate range for pitch bend, should be between 0.01f and 0.3f (1% and 30%).
 /// @param bendStretch Use time-stretching for pitch bend or not (false makes it "audible").
 /// @param faster True: faster, false: slower.
-/// @param holdMs How long to maintain the pitch bend state. A value >= 1000 will hold until endContinuousPitchBend is called.
+/// @param holdMs How long to maintain the pitch bend state. A value >= 1000 will hold until endContinuousPitchBend is called. A value < 40 will not "ramp up" pitch bend, but will apply it immediately.
     JSWASM void pitchBend(float maxPercent, bool bendStretch, bool faster, unsigned int holdMs);
 
 /// @brief Ends pitch bend.
     JSWASM void endContinuousPitchBend();
-    
+
 /// @return Returns with the distance (in milliseconds) to the beatgrid while using pitch bend for correction.
     JSWASM double getBendOffsetMs();
 
@@ -437,7 +436,7 @@ public:
 /// @return Indicates if the player is in scratching mode.
     JSWASM bool isScratching();
 
-/// @return If jog wheel mode is JogMode_Parameter, returns with the current parameter typically in the range of -1 to 1, or less than -1000000.0 if there was no jog wheel movement. processStereo or processMulti updates this value, therefore it's recommended to read it after those calls were made, in the same thread.
+/// @return If jog wheel mode is JogMode_Parameter, returns with the current parameter typically in the range of -1 to 1, or more than 1000000.0 if there was no jog wheel movement. processStereo or processMulti updates this value, therefore it's recommended to read it after those calls were made, in the same thread.
     JSWASM double getJogParameter();
 
 private:

@@ -127,12 +127,21 @@ static unsigned int nearestPowerOfTwo(unsigned int n) {
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onRouteChange:) name:AVAudioSessionRouteChangeNotification object:[AVAudioSession sharedInstance]];
 
 #if (USES_AUDIO_INPUT == 1)
+#if __IPHONE_OS_VERSION_MIN_REQUIRED >= 170000
+        if ((recordOnly || [category isEqualToString:AVAudioSessionCategoryPlayAndRecord]) && ([AVAudioApplication sharedInstance].recordPermission != AVAudioApplicationRecordPermissionGranted)) {
+            [AVAudioApplication requestRecordPermissionWithCompletionHandler:^(BOOL granted) {
+                if (granted) [self onMediaServerReset:nil];
+                else if ([(NSObject *)self->delegate respondsToSelector:@selector(recordPermissionRefused)]) [self->delegate recordPermissionRefused];
+            }];
+        };
+#else
         if ((recordOnly || [category isEqualToString:AVAudioSessionCategoryPlayAndRecord]) && [[AVAudioSession sharedInstance] respondsToSelector:@selector(recordPermission)] && [[AVAudioSession sharedInstance] respondsToSelector:@selector(requestRecordPermission:)] && ([[AVAudioSession sharedInstance] recordPermission] != AVAudioSessionRecordPermissionGranted)) {
             [[AVAudioSession sharedInstance] requestRecordPermission:^(BOOL granted) {
                 if (granted) [self onMediaServerReset:nil];
                 else if ([(NSObject *)self->delegate respondsToSelector:@selector(recordPermissionRefused)]) [self->delegate recordPermissionRefused];
             }];
         };
+#endif
 #endif
     };
     return self;
@@ -222,15 +231,8 @@ static unsigned int nearestPowerOfTwo(unsigned int n) {
     NSNumber *interruption = [notification.userInfo objectForKey:AVAudioSessionInterruptionTypeKey];
     if (interruption != nil) switch ([interruption intValue]) {
         case AVAudioSessionInterruptionTypeBegan: {
-            bool wasSuspended = false;
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wtautological-pointer-compare"
-            if (&AVAudioSessionInterruptionWasSuspendedKey != NULL) {
-#pragma clang diagnostic pop
-                NSNumber *obj = [notification.userInfo objectForKey:AVAudioSessionInterruptionWasSuspendedKey];
-                if ((obj != nil) && ([obj boolValue] == TRUE)) wasSuspended = true;
-            }
-            if (!wasSuspended) {
+            NSNumber *obj = [notification.userInfo objectForKey:AVAudioSessionInterruptionReasonKey];
+            if (!obj || ([obj boolValue] != TRUE)) { // was not suspended
                 if (audioUnitRunning) [self performSelectorOnMainThread:@selector(startDelegateInterruption) withObject:nil waitUntilDone:NO];
                 [self beginInterruption];
             }
@@ -432,9 +434,21 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
         }
     }
 
-    if (((int)inNumberFrames < self->minimumNumberOfFrames) || ((int)inNumberFrames > self->maximumNumberOfFrames) || ((int)ioData->mBuffers[0].mNumberChannels != self->numberOfChannels)) {
-        return kAudioUnitErr_InvalidParameter;
-    };
+    BOOL isiOSAppOnMac = false;
+#if !TARGET_OS_MACCATALYST // iOS or Mac (Designed for iPad)
+    if (@available(iOS 14.0, *)) {
+        isiOSAppOnMac = NSProcessInfo.processInfo.isiOSAppOnMac;
+    }
+#endif
+    if (isiOSAppOnMac) {
+        if (((int)inNumberFrames < self->minimumNumberOfFrames) || ((int)inNumberFrames > self->maximumNumberOfFrames) || ((int)ioData->mBuffers[0].mNumberChannels != self->numberOfChannels)) {
+            return kAudioUnitErr_InvalidParameter;
+        };
+    } else {
+        if ((d.rem != 0) || (inNumberFrames < 32) || (inNumberFrames > MAXFRAMES) || ((int)ioData->mBuffers[0].mNumberChannels != self->numberOfChannels)) {
+            return kAudioUnitErr_InvalidParameter;
+        };
+    }
 
     // Get audio input.
     float *inputBuf = NULL;
@@ -602,7 +616,17 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
     bool recordOnly = [category isEqualToString:AVAudioSessionCategoryRecord];
     inputEnabled = recordOnly || [category isEqualToString:AVAudioSessionCategoryPlayAndRecord];
     if (inputEnabled && !inputBuffer) [self createInputBuffer];
-
+#if __IPHONE_OS_VERSION_MIN_REQUIRED >= 170000
+    if (inputEnabled) {
+        if ([[AVAudioApplication sharedInstance] recordPermission] == AVAudioApplicationRecordPermissionGranted) [self onMediaServerReset:nil];
+        else {
+            [AVAudioApplication requestRecordPermissionWithCompletionHandler:^(BOOL granted) {
+                if (granted) [self onMediaServerReset:nil];
+                else if ([(NSObject *)self->delegate respondsToSelector:@selector(recordPermissionRefused)]) [self->delegate recordPermissionRefused];
+            }];
+        };
+    } else [self onMediaServerReset:nil];
+#else
     if (inputEnabled && [[AVAudioSession sharedInstance] respondsToSelector:@selector(recordPermission)] && [[AVAudioSession sharedInstance] respondsToSelector:@selector(requestRecordPermission:)]) {
         if ([[AVAudioSession sharedInstance] recordPermission] == AVAudioSessionRecordPermissionGranted) [self onMediaServerReset:nil];
         else {
@@ -612,6 +636,8 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
             }];
         };
     } else [self onMediaServerReset:nil];
+#endif
+
 #else
     [self onMediaServerReset:nil];
 #endif
