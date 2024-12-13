@@ -10,7 +10,7 @@
 #include <dlfcn.h>
 #include <android/log.h>
 
-#define USE_AAUDIO 0
+#define USE_AAUDIO 1
 
 #define AAUDIO_CALLBACK_RESULT_CONTINUE  0
 #define AAUDIO_OK 0
@@ -418,13 +418,13 @@ static void SuperpoweredAndroidAudioIO_OutputCallback(SLAndroidSimpleBufferQueue
     };
 }
 
-SuperpoweredAndroidAudioIO::SuperpoweredAndroidAudioIO(int samplerate, int buffersize, bool enableInput, bool enableOutput, audioProcessingCallback callback, void *clientdata, int inputStreamType, int outputStreamType) {
+SuperpoweredAndroidAudioIO::SuperpoweredAndroidAudioIO(int samplerate, int buffersize, bool enableInput, bool enableOutput, bool preferAAudio, audioProcessingCallback callback, void *clientdata, int inputStreamType, int outputStreamType) {
     static const SLboolean requireds[2] = { SL_BOOLEAN_TRUE, SL_BOOLEAN_FALSE };
     if (buffersize > 1024) buffersize = 1024;
 
     internals = new SuperpoweredAndroidAudioIOInternals;
     memset(internals, 0, sizeof(SuperpoweredAndroidAudioIOInternals));
-    internals->aaudio = initializeAAudio();
+    internals->aaudio = preferAAudio && initializeAAudio();
     internals->samplerate = samplerate;
     internals->buffersize = buffersize;
     internals->clientdata = clientdata;
@@ -548,6 +548,20 @@ void SuperpoweredAndroidAudioIO::start() {
 
 void SuperpoweredAndroidAudioIO::stop() {
     if (internals->aaudio) stopAAudio(internals); else stopQueues(internals);
+}
+
+bool SuperpoweredAndroidAudioIO::isAAudioInitialized() {
+    return internals->aaudio;
+}
+
+bool SuperpoweredAndroidAudioIO::isAAudioRestarting() {
+    return internals->aaudio && internals->aaudioRestarting;
+}
+
+void SuperpoweredAndroidAudioIO::resetInputBufferIndices() {
+    if (internals->inputFifo.readIndex != internals->inputFifo.writeIndex) {
+        internals->inputFifo.readIndex = internals->inputFifo.writeIndex;
+    }
 }
 
 SuperpoweredAndroidAudioIO::~SuperpoweredAndroidAudioIO() {
