@@ -35,6 +35,9 @@ typedef struct multiInputChannelMap {
 
 @protocol SuperpoweredIOSAudioIODelegate;
 
+// For calling back to the audio service after a system callback reinitializes the audio unit
+typedef void (*resetCallback)(void);
+
 /// @brief You can have an audio processing callback in Objective-C or pure C. This is the pure C prototype.
 /// @return Return false when you did no audio processing (silence).
 /// @param clientdata A custom pointer your callback receives.
@@ -43,7 +46,7 @@ typedef struct multiInputChannelMap {
 /// @param numberOfFrames The number of frames requested.
 /// @param samplerate The current sample rate in Hz.
 /// @param hostTime A mach timestamp, indicates when this buffer of audio will be passed to the audio output.
-typedef bool (*audioProcessingCallback) (void *clientdata, float *inputBuffer, float *outputBuffer, unsigned int numberOfFrames, unsigned int samplerate, uint64_t hostTime);
+typedef bool (*audioProcessingCallback) (void *clientdata, float *inputBuffer, float *outputBuffer, unsigned int numberOfFrames, unsigned int samplerate, uint64_t hostTime, int inputBufferStatusCode);
 
 /// @brief Handles all audio session, audio lifecycle (interruptions), output, buffer size, samplerate and routing headaches.
 /// @warning All methods and setters should be called on the main thread only!
@@ -67,7 +70,16 @@ typedef bool (*audioProcessingCallback) (void *clientdata, float *inputBuffer, f
 /// @param channels The number of output channels in the audio processing callback regardless the actual hardware capabilities. The number of input channels in the audio processing callback will reflect the actual hardware configuration.
 /// @param callback The audio processing callback.
 /// @param clientdata Custom data passed to the audio processing callback.
-- (id)initWithDelegate:(id<SuperpoweredIOSAudioIODelegate>)delegate preferredBufferSize:(unsigned int)preferredBufferSize preferredSamplerate:(unsigned int)preferredSamplerate audioSessionCategory:(NSString *)audioSessionCategory channels:(int)channels audioProcessingCallback:(audioProcessingCallback)callback clientdata:(void *)clientdata;
+- (id)initWithDelegate:(id<SuperpoweredIOSAudioIODelegate>)delegate
+   preferredBufferSize:(unsigned int)preferredBufferSize
+   preferredSamplerate:(unsigned int)preferredSamplerate
+  audioSessionCategory:(NSString *)audioSessionCategory
+  audioSessionCategoryOptions:(AVAudioSessionCategoryOptions)audioSessionCategoryOptions
+              channels:(int)channels
+audioProcessingCallback:(audioProcessingCallback)callback
+         resetCallback:(resetCallback)rc1
+         resetCallback:(resetCallback)rc2
+            clientdata:(void *)clientdata;
 
 /// @brief Starts audio I/O.
 /// @return True if successful, false if failed.
