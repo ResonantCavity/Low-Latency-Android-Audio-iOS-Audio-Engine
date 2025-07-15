@@ -113,9 +113,31 @@ static unsigned int nearestPowerOfTwo(unsigned int n) {
 #if (USES_AUDIO_INPUT == 1)
         if (inputEnabled) [self createInputBuffer];
 #endif
-        stopTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:self selector:@selector(everySecond) userInfo:nil repeats:YES];
 #if !__has_feature(objc_arc)
+        stopTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:self selector:@selector(everySecond) userInfo:nil repeats:YES];
         [self release]; // to prevent NSTimer retaining this
+#else
+        __weak SuperpoweredIOSAudioIO *weakSelf = self;
+        stopTimer = [NSTimer scheduledTimerWithTimeInterval:2.0 repeats:YES block:^(NSTimer * _Nonnull timer) {
+            __strong SuperpoweredIOSAudioIO *strongSelf = weakSelf;
+            if (!strongSelf) return;
+            if (strongSelf->silenceFrames > strongSelf->samplerate) {
+                [strongSelf beginInterruption];
+                strongSelf->silenceFrames = 0;
+            } else if (!strongSelf->background && strongSelf->audioUnitRunning && strongSelf->started) { // If it should run...
+                mach_timebase_info_data_t timebase;
+                mach_timebase_info(&timebase);
+                uint64_t diff = mach_absolute_time() - strongSelf->lastCallbackTime;
+                diff *= timebase.numer;
+                diff /= timebase.denom;
+                if (diff > 1000000000) { // But it didn't call the audio processing callback in the past second.
+                    strongSelf->audioUnitRunning = false;
+                    [[AVAudioSession sharedInstance] setActive:NO error:nil];
+                    [strongSelf resetAudio];
+                    [strongSelf start];
+                }
+            }
+        }];
 #endif
         [self resetAudio];
 
@@ -181,6 +203,7 @@ static unsigned int nearestPowerOfTwo(unsigned int n) {
     };
 }
 
+#if !__has_feature(objc_arc)
 - (void)everySecond { // If we waited for more than 1 second with silence, stop RemoteIO to save battery.
     if (silenceFrames > samplerate) {
         [self beginInterruption];
@@ -199,6 +222,7 @@ static unsigned int nearestPowerOfTwo(unsigned int n) {
         }
     }
 }
+#endif
 
 - (void)beginInterruption { // Phone call, etc.
     if (![NSThread isMainThread]) [self performSelectorOnMainThread:@selector(beginInterruption) withObject:nil waitUntilDone:NO];
@@ -578,6 +602,7 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
     outputChannelMap.deviceChannels[0] = outputChannelMap.deviceChannels[1] = -1;
     for (int n = 0; n < 8; n++) outputChannelMap.HDMIChannels[n] = -1;
     for (int n = 0; n < 32; n++) outputChannelMap.USBChannels[n] = inputChannelMap.USBChannels[n] = -1;
+
     if ([(NSObject *)self->delegate respondsToSelector:@selector(mapChannels:inputMap:externalAudioDeviceName:outputsAndInputs:)]) [delegate mapChannels:&outputChannelMap inputMap:&inputChannelMap externalAudioDeviceName:externalAudioDeviceName outputsAndInputs:audioSystemInfo];
     if (!audioUnit || (numberOfChannels <= 2)) return;
 
