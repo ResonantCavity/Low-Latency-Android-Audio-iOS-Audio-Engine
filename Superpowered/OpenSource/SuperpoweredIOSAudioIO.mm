@@ -53,6 +53,7 @@ static unsigned int nearestPowerOfTwo(unsigned int n) {
     uint64_t lastCallbackTime;
     int numberOfChannels, silenceFrames, samplerate, minimumNumberOfFrames, maximumNumberOfFrames;
     bool audioUnitRunning, background, inputEnabled;
+    bool useMeasurementMode;
 }
 
 @synthesize preferredBufferSizeMs, preferredSamplerate, saveBatteryInBackground, started;
@@ -109,6 +110,7 @@ static unsigned int nearestPowerOfTwo(unsigned int n) {
         externalAudioDeviceName = nil;
         audioUnit = NULL;
         inputBuffer = NULL;
+        useMeasurementMode = false;
 
 #if (USES_AUDIO_INPUT == 1)
         if (inputEnabled) [self createInputBuffer];
@@ -396,7 +398,35 @@ static unsigned int nearestPowerOfTwo(unsigned int n) {
 #else
     [[AVAudioSession sharedInstance] setCategory:multiRoute ? AVAudioSessionCategoryMultiRoute : audioSessionCategory error:NULL];
 #endif
-    [[AVAudioSession sharedInstance] setMode:AVAudioSessionModeDefault error:NULL];
+    AVAudioSession *s = [AVAudioSession sharedInstance];
+
+    // 1) Use a record-capable category (required to use Measurement mode)
+    //    DO NOT set DefaultToSpeaker. Avoid HFP by not setting AllowBluetooth.
+    //    (If you must keep BT for music, prefer A2DP only.)
+    AVAudioSessionCategoryOptions opts = 0;
+    // opts |= AVAudioSessionCategoryOptionAllowBluetoothA2DP; // optional if you ALSO support music headsets
+    // (intentionally NOT using DefaultToSpeaker or AllowBluetooth/HFP)
+
+    [s setCategory:AVAudioSessionCategoryPlayAndRecord
+        withOptions:opts
+              error:nil];
+
+    // 2) Prefer the built-in mic to avoid getting dragged onto HFP routes.
+    AVAudioSessionPortDescription *builtInMic = nil;
+    for (AVAudioSessionPortDescription *p in s.availableInputs) {
+        if ([p.portType isEqualToString:AVAudioSessionPortBuiltInMic]) { builtInMic = p; break; }
+    }
+    if (builtInMic) [s setPreferredInput:builtInMic error:nil];
+
+    // 3) Measurement mode = no Apple voice processing on input.
+    [s setMode:AVAudioSessionModeMeasurement error:nil];
+
+    // 4) Activate, then explicitly avoid overriding to speaker (keep receiver).
+    [s setActive:YES error:nil];
+    [s overrideOutputAudioPort:AVAudioSessionPortOverrideNone error:nil];
+
+    // (Optional) verify we actually got the receiver:
+    AVAudioSessionRouteDescription *r = s.currentRoute;
     [self applyBuffersize];
     [self applySamplerate];
     [[AVAudioSession sharedInstance] setActive:YES error:NULL];
@@ -575,6 +605,36 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
     if (AudioOutputUnitStart(audioUnit)) return false;
     audioUnitRunning = true;
     [[AVAudioSession sharedInstance] setActive:YES error:nil];
+    // Re-assert session active and mode (harmless if unchanged)
+    AVAudioSession *s = [AVAudioSession sharedInstance];
+
+    // 1) Use a record-capable category (required to use Measurement mode)
+    //    DO NOT set DefaultToSpeaker. Avoid HFP by not setting AllowBluetooth.
+    //    (If you must keep BT for music, prefer A2DP only.)
+    AVAudioSessionCategoryOptions opts = 0;
+    // opts |= AVAudioSessionCategoryOptionAllowBluetoothA2DP; // optional if you ALSO support music headsets
+    // (intentionally NOT using DefaultToSpeaker or AllowBluetooth/HFP)
+
+    [s setCategory:AVAudioSessionCategoryPlayAndRecord
+        withOptions:opts
+              error:nil];
+
+    // 2) Prefer the built-in mic to avoid getting dragged onto HFP routes.
+    AVAudioSessionPortDescription *builtInMic = nil;
+    for (AVAudioSessionPortDescription *p in s.availableInputs) {
+        if ([p.portType isEqualToString:AVAudioSessionPortBuiltInMic]) { builtInMic = p; break; }
+    }
+    if (builtInMic) [s setPreferredInput:builtInMic error:nil];
+
+    // 3) Measurement mode = no Apple voice processing on input.
+    [s setMode:AVAudioSessionModeMeasurement error:nil];
+
+    // 4) Activate, then explicitly avoid overriding to speaker (keep receiver).
+    [s setActive:YES error:nil];
+    [s overrideOutputAudioPort:AVAudioSessionPortOverrideNone error:nil];
+
+    // (Optional) verify we actually got the receiver:
+    AVAudioSessionRouteDescription *r = s.currentRoute;
     return true;
 }
 
