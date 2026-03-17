@@ -75,11 +75,40 @@ static unsigned int nearestPowerOfTwo(unsigned int n) {
     }
 }
 
-- (id)initWithDelegate:(NSObject<SuperpoweredIOSAudioIODelegate> *)d preferredBufferSize:(unsigned int)preferredBufferSize preferredSamplerate:(unsigned int)prefsamplerate audioSessionCategory:(NSString *)category channels:(int)channels audioProcessingCallback:(audioProcessingCallback)callback clientdata:(void *)clientdata {
-    return [self initWithDelegateNonInterleaved:d preferredBufferSize:preferredBufferSize preferredSamplerate:prefsamplerate audioSessionCategory:category channels:-channels audioProcessingCallback:(audioProcessingCallbackNonInterleaved)callback clientdata:clientdata];
+- (id)initWithDelegate:(NSObject<SuperpoweredIOSAudioIODelegate> *)d
+   preferredBufferSize:(unsigned int)preferredBufferSize
+   preferredSamplerate:(unsigned int)prefsamplerate
+  audioSessionCategory:(NSString *)category
+audioSessionCategoryOptions:(AVAudioSessionCategoryOptions)categoryOptions
+              channels:(int)channels
+audioProcessingCallback:(audioProcessingCallback)callback
+         resetCallback:(resetCallback)rc1
+         resetCallback:(resetCallback)rc2
+            clientdata:(void *)clientdata
+{
+    return [self initWithDelegateNonInterleaved:d
+                            preferredBufferSize:preferredBufferSize
+                            preferredSamplerate:prefsamplerate
+                           audioSessionCategory:category
+                    audioSessionCategoryOptions:categoryOptions
+                                       channels:-channels
+                        audioProcessingCallback:(audioProcessingCallbackNonInterleaved)callback
+                                  resetCallback:rc1
+                                  resetCallback:rc2
+                                     clientdata:clientdata];
 }
 
-- (id)initWithDelegateNonInterleaved:(NSObject<SuperpoweredIOSAudioIODelegate> *)d preferredBufferSize:(unsigned int)preferredBufferSize preferredSamplerate:(unsigned int)prefsamplerate audioSessionCategory:(NSString *)category channels:(int)channels audioProcessingCallback:(audioProcessingCallbackNonInterleaved)callback clientdata:(void *)clientdata {
+- (id)initWithDelegateNonInterleaved:(NSObject<SuperpoweredIOSAudioIODelegate> *)d
+                 preferredBufferSize:(unsigned int)preferredBufferSize
+                 preferredSamplerate:(unsigned int)prefsamplerate
+                audioSessionCategory:(NSString *)category
+         audioSessionCategoryOptions:(AVAudioSessionCategoryOptions)categoryOptions
+                            channels:(int)channels
+             audioProcessingCallback:(audioProcessingCallbackNonInterleaved)callback
+                       resetCallback:(resetCallback)rc1
+                       resetCallback:(resetCallback)rc2
+                          clientdata:(void *)clientdata
+{
     self = [super init];
     if (self) {
         interleaved = channels < 0;
@@ -468,6 +497,7 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
     if ((d.rem != 0) || (inNumberFrames < 32) || (inNumberFrames > MAXFRAMES) || (int(self->interleaved ? ioData->mBuffers[0].mNumberChannels : ioData->mNumberBuffers) != self->numberOfChannels)) return kAudioUnitErr_InvalidParameter;
 
     bool silence = true;
+    int inputBufferStatusCode = 0;
     if (self->interleaved) {
         // Get audio input.
         float *inputBuf = NULL;
