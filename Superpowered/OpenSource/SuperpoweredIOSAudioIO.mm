@@ -90,13 +90,14 @@ static unsigned int nearestPowerOfTwo(unsigned int n) {
     resetCallback:(resetCallback)rc2
     clientdata:(void *)clientdata
 {
-    return [self initWithDelegateNonInterleaved:d preferredBufferSize:preferredBufferSize preferredSamplerate:prefsamplerate audioSessionCategory:category channels:-channels audioProcessingCallback:(audioProcessingCallbackNonInterleaved)callback clientdata:clientdata];
+    return [self initWithDelegateNonInterleaved:d preferredBufferSize:preferredBufferSize preferredSamplerate:prefsamplerate audioSessionCategory:category audioSessionCategoryOptions:categoryOptions channels:-channels audioProcessingCallback:(audioProcessingCallbackNonInterleaved)callback resetCallback:rc1 resetCallback:rc2 clientdata:clientdata];
 }
 
 - (id)initWithDelegateNonInterleaved:(NSObject<SuperpoweredIOSAudioIODelegate> *)d
     preferredBufferSize:(unsigned int)preferredBufferSize
     preferredSamplerate:(unsigned int)prefsamplerate
     audioSessionCategory:(NSString *)category
+    audioSessionCategoryOptions:(AVAudioSessionCategoryOptions)categoryOptions
     channels:(int)channels
     audioProcessingCallback:(audioProcessingCallbackNonInterleaved)callback
     resetCallback:(resetCallback)rc1
@@ -499,6 +500,7 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
 #endif
     if ((d.rem != 0) || (inNumberFrames < 32) || (inNumberFrames > MAXFRAMES) || (int(self->interleaved ? ioData->mBuffers[0].mNumberChannels : ioData->mNumberBuffers) != self->numberOfChannels)) return kAudioUnitErr_InvalidParameter;
 
+    int inputBufferStatusCode = 0;
     bool silence = true;
     if (self->interleaved) {
         // Get audio input.
@@ -539,7 +541,7 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
 
             if (!result) {
                 // We have input!
-                inputs = self->inputBufs
+                inputs = self->inputBufs;
 
                 // Check if inNumberFrames is large.
                 if (inNumberFrames > 1024 || inNumberFrames != nearestPowerOfTwo(inNumberFrames)) {
@@ -552,7 +554,7 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
         }
         // Make audio output.
         for (int n = 0; n < self->numberOfChannels; n++) self->outputBufs[n] = (float *)ioData->mBuffers[n].mData;
-        silence = !self->processingCallback(self->processingClientdata, inputs, self->outputBufs, inNumberFrames, self->samplerate, inTimeStamp->mHostTime, inputBufferStatusCode);
+        silence = !((audioProcessingCallbackNonInterleaved)self->processingCallback)(self->processingClientdata, inputs, self->outputBufs, inNumberFrames, self->samplerate, inTimeStamp->mHostTime, inputBufferStatusCode);
     }
 
     if (silence) { // Despite of ioActionFlags, it outputs garbage sometimes, so must zero the buffers:
