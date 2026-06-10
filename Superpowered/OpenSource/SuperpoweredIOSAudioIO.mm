@@ -551,8 +551,6 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
                 self->inputBuffer->mBuffers[n].mNumberChannels = 1;
             }
             self->inputBuffer->mNumberBuffers = self->numberOfChannels;
-            if (!AudioUnitRender(self->audioUnit, ioActionFlags, inTimeStamp, 1, inNumberFrames, self->inputBuffer)) inputs = self->inputBufs;
-
             OSStatus result = AudioUnitRender(self->audioUnit, ioActionFlags, inTimeStamp, 1, inNumberFrames, self->inputBuffer);
 
             if (!result) {
