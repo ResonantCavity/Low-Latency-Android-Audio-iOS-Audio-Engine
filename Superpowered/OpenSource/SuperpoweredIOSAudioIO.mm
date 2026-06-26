@@ -53,6 +53,11 @@ static unsigned int nearestPowerOfTwo(unsigned int n) {
     audioDeviceType RemoteIOOutputChannelMap[64];
     uint64_t lastCallbackTime;
     int numberOfChannels, silenceFrames, samplerate, minimumNumberOfFrames, maximumNumberOfFrames;
+    // The sample rate the audio unit's client-side stream format was created with.
+    // If the hardware rate later diverges from this, the unit must be recreated:
+    // CoreAudio would otherwise keep interpreting our output through the stale
+    // client format and silently resample, shifting pitch/speed by the rate ratio.
+    int clientFormatSamplerate;
     bool audioUnitRunning, background, inputEnabled, interleaved;
 }
 
@@ -137,7 +142,7 @@ static unsigned int nearestPowerOfTwo(unsigned int n) {
         audioSystemInfo = [[NSMutableString alloc] initWithCapacity:256];
         silenceFrames = 0;
         background = audioUnitRunning = false;
-        samplerate = minimumNumberOfFrames = maximumNumberOfFrames = 0;
+        samplerate = clientFormatSamplerate = minimumNumberOfFrames = maximumNumberOfFrames = 0;
         externalAudioDeviceName = nil;
         audioUnit = NULL;
         inputBuffer = NULL;
@@ -474,7 +479,25 @@ static void streamFormatChangedCallback(void *inRefCon, AudioUnit inUnit, AudioU
             self->maximumNumberOfFrames = nearestPowerOfTwo(maximum / 8) * 8;
             if (self->maximumNumberOfFrames < MAXFRAMES) self->maximumNumberOfFrames = MAXFRAMES;
             if (self->minimumNumberOfFrames < 16) self->minimumNumberOfFrames = 16;
-            [self performSelectorOnMainThread:@selector(applyBuffersize) withObject:nil waitUntilDone:NO];
+            if (self->clientFormatSamplerate == 0) {
+                // The format query at creation time returned 0 (it can before
+                // AudioUnitInitialize). A client format with sample rate 0 inherits
+                // the hardware rate, so there is no divergence: adopt the reported
+                // rate as the baseline.
+                self->clientFormatSamplerate = sr;
+                [self performSelectorOnMainThread:@selector(applyBuffersize) withObject:nil waitUntilDone:NO];
+            } else if (sr != self->clientFormatSamplerate) {
+                // The hardware rate diverged from the rate the audio unit's client
+                // stream format was created with (e.g. the unit was created mid route
+                // change while a headset DAC was still negotiating). CoreAudio would
+                // silently resample through the stale client format, playing our
+                // output pitched/stretched by the rate ratio. Recreate the audio unit
+                // so the client format matches the settled hardware rate.
+                NSLog(@"SuperpoweredIOSAudioIO: hardware samplerate %i diverged from clientFormatSamplerate %i, recreating audio unit", sr, self->clientFormatSamplerate);
+                [self performSelectorOnMainThread:@selector(onMediaServerReset:) withObject:nil waitUntilDone:NO];
+            } else {
+                [self performSelectorOnMainThread:@selector(applyBuffersize) withObject:nil waitUntilDone:NO];
+            }
         }
     }
 }
@@ -535,8 +558,6 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
                 self->inputBuffer->mBuffers[n].mNumberChannels = 1;
             }
             self->inputBuffer->mNumberBuffers = self->numberOfChannels;
-            if (!AudioUnitRender(self->audioUnit, ioActionFlags, inTimeStamp, 1, inNumberFrames, self->inputBuffer)) inputs = self->inputBufs;
-
             OSStatus result = AudioUnitRender(self->audioUnit, ioActionFlags, inTimeStamp, 1, inNumberFrames, self->inputBuffer);
 
             if (!result) {
@@ -584,14 +605,16 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
     value = inputEnabled ? 1 : 0;
     if (AudioUnitSetProperty(au, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, 1, &value, sizeof(value))) { AudioComponentInstanceDispose(au); return NULL; };
 
-    AudioUnitAddPropertyListener(au, kAudioUnitProperty_StreamFormat, streamFormatChangedCallback, (__bridge void *)self);
-
     UInt32 size = 0;
     AudioUnitGetPropertyInfo(au, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &size, NULL);
     AudioStreamBasicDescription format;
     AudioUnitGetProperty(au, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &format, &size);
 
-    samplerate = (int)format.mSampleRate;
+    samplerate = clientFormatSamplerate = (int)format.mSampleRate;
+
+    // Register the listener after clientFormatSamplerate is set, so a format event
+    // firing during creation can't compare against a stale baseline.
+    AudioUnitAddPropertyListener(au, kAudioUnitProperty_StreamFormat, streamFormatChangedCallback, (__bridge void *)self);
 
     format.mFormatID = kAudioFormatLinearPCM;
     format.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked | kAudioFormatFlagsNativeEndian;
@@ -613,6 +636,18 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
     };
 
     if (AudioUnitInitialize(au)) { AudioComponentInstanceDispose(au); return NULL; };
+
+    // The pre-initialize format query can return 0. Now that the unit is
+    // initialized, read back the client-side format to record the rate the unit
+    // will actually interpret our samples with — the baseline for detecting a
+    // stale client format after the hardware rate settles.
+    UInt32 clientSize = 0;
+    AudioStreamBasicDescription clientFormat;
+    AudioUnitGetPropertyInfo(au, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &clientSize, NULL);
+    if (!AudioUnitGetProperty(au, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &clientFormat, &clientSize) && (clientFormat.mSampleRate != 0)) {
+        clientFormatSamplerate = (int)clientFormat.mSampleRate;
+    }
+    NSLog(@"SuperpoweredIOSAudioIO: createRemoteIO clientFormatSamplerate=%i", clientFormatSamplerate);
     return au;
 }
 
