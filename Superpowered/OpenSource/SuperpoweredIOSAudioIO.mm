@@ -42,8 +42,6 @@ static unsigned int nearestPowerOfTwo(unsigned int n) {
     NSTimer *stopTimer;
     NSMutableString *audioSystemInfo;
     audioProcessingCallbackNonInterleaved processingCallback;
-    resetCallback resetCallback1;
-    resetCallback resetCallback2;
     void *processingClientdata;
     float **inputBufs, **outputBufs;
     AudioBufferList *inputBuffer;
@@ -53,11 +51,6 @@ static unsigned int nearestPowerOfTwo(unsigned int n) {
     audioDeviceType RemoteIOOutputChannelMap[64];
     uint64_t lastCallbackTime;
     int numberOfChannels, silenceFrames, samplerate, minimumNumberOfFrames, maximumNumberOfFrames;
-    // The sample rate the audio unit's client-side stream format was created with.
-    // If the hardware rate later diverges from this, the unit must be recreated:
-    // CoreAudio would otherwise keep interpreting our output through the stale
-    // client format and silently resample, shifting pitch/speed by the rate ratio.
-    int clientFormatSamplerate;
     bool audioUnitRunning, background, inputEnabled, interleaved;
 }
 
@@ -84,31 +77,11 @@ static unsigned int nearestPowerOfTwo(unsigned int n) {
     }
 }
 
-- (id)initWithDelegate:(NSObject<SuperpoweredIOSAudioIODelegate> *)d
-    preferredBufferSize:(unsigned int)preferredBufferSize
-    preferredSamplerate:(unsigned int)prefsamplerate
-    audioSessionCategory:(NSString *)category
-    audioSessionCategoryOptions:(AVAudioSessionCategoryOptions)categoryOptions
-    channels:(int)channels
-    audioProcessingCallback:(audioProcessingCallback)callback
-    resetCallback:(resetCallback)rc1
-    resetCallback:(resetCallback)rc2
-    clientdata:(void *)clientdata
-{
-    return [self initWithDelegateNonInterleaved:d preferredBufferSize:preferredBufferSize preferredSamplerate:prefsamplerate audioSessionCategory:category audioSessionCategoryOptions:categoryOptions channels:-channels audioProcessingCallback:(audioProcessingCallbackNonInterleaved)callback resetCallback:rc1 resetCallback:rc2 clientdata:clientdata];
+- (id)initWithDelegate:(NSObject<SuperpoweredIOSAudioIODelegate> *)d preferredBufferSize:(unsigned int)preferredBufferSize preferredSamplerate:(unsigned int)prefsamplerate audioSessionCategory:(NSString *)category audioSessionCategoryOptions:(AVAudioSessionCategoryOptions)categoryOptions channels:(int)channels audioProcessingCallback:(audioProcessingCallback)callback clientdata:(void *)clientdata {
+    return [self initWithDelegateNonInterleaved:d preferredBufferSize:preferredBufferSize preferredSamplerate:prefsamplerate audioSessionCategory:category audioSessionCategoryOptions:categoryOptions channels:-channels audioProcessingCallback:(audioProcessingCallbackNonInterleaved)callback clientdata:clientdata];
 }
 
-- (id)initWithDelegateNonInterleaved:(NSObject<SuperpoweredIOSAudioIODelegate> *)d
-    preferredBufferSize:(unsigned int)preferredBufferSize
-    preferredSamplerate:(unsigned int)prefsamplerate
-    audioSessionCategory:(NSString *)category
-    audioSessionCategoryOptions:(AVAudioSessionCategoryOptions)categoryOptions
-    channels:(int)channels
-    audioProcessingCallback:(audioProcessingCallbackNonInterleaved)callback
-    resetCallback:(resetCallback)rc1
-    resetCallback:(resetCallback)rc2
-    clientdata:(void *)clientdata
-{
+- (id)initWithDelegateNonInterleaved:(NSObject<SuperpoweredIOSAudioIODelegate> *)d preferredBufferSize:(unsigned int)preferredBufferSize preferredSamplerate:(unsigned int)prefsamplerate audioSessionCategory:(NSString *)category audioSessionCategoryOptions:(AVAudioSessionCategoryOptions)categoryOptions channels:(int)channels audioProcessingCallback:(audioProcessingCallbackNonInterleaved)callback clientdata:(void *)clientdata {
     self = [super init];
     if (self) {
         interleaved = channels < 0;
@@ -135,14 +108,12 @@ static unsigned int nearestPowerOfTwo(unsigned int n) {
         inputEnabled = false;
 #endif
         processingCallback = callback;
-        resetCallback1 = rc1;
-        resetCallback2 = rc2;
         processingClientdata = clientdata;
         delegate = d;
         audioSystemInfo = [[NSMutableString alloc] initWithCapacity:256];
         silenceFrames = 0;
         background = audioUnitRunning = false;
-        samplerate = clientFormatSamplerate = minimumNumberOfFrames = maximumNumberOfFrames = 0;
+        samplerate = minimumNumberOfFrames = maximumNumberOfFrames = 0;
         externalAudioDeviceName = nil;
         audioUnit = NULL;
         inputBuffer = NULL;
@@ -154,9 +125,9 @@ static unsigned int nearestPowerOfTwo(unsigned int n) {
         stopTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:self selector:@selector(everySecond) userInfo:nil repeats:YES];
         [self release]; // to prevent NSTimer retaining this
 #else
-        __weak SuperpoweredIOSAudioIO *weakSelf = self;
+        SuperpoweredIOSAudioIO* __weak weakSelf = self;
         stopTimer = [NSTimer scheduledTimerWithTimeInterval:2.0 repeats:YES block:^(NSTimer * _Nonnull timer) {
-            __strong SuperpoweredIOSAudioIO *strongSelf = weakSelf;
+            __strong SuperpoweredIOSAudioIO* strongSelf = weakSelf;
             if (!strongSelf) return;
             if (strongSelf->silenceFrames > strongSelf->samplerate) {
                 [strongSelf beginInterruption];
@@ -415,7 +386,6 @@ static unsigned int nearestPowerOfTwo(unsigned int n) {
 
 - (void)resetAudio {
     if (audioUnit != NULL) {
-        self->resetCallback1();
         AudioUnitUninitialize(audioUnit);
         AudioComponentInstanceDispose(audioUnit);
         audioUnit = NULL;
@@ -443,7 +413,6 @@ static unsigned int nearestPowerOfTwo(unsigned int n) {
 
     audioUnit = [self createRemoteIO];
     if (!multiRoute) [self onRouteChange:nil];
-    self->resetCallback2();
 }
 
 /*
@@ -479,25 +448,7 @@ static void streamFormatChangedCallback(void *inRefCon, AudioUnit inUnit, AudioU
             self->maximumNumberOfFrames = nearestPowerOfTwo(maximum / 8) * 8;
             if (self->maximumNumberOfFrames < MAXFRAMES) self->maximumNumberOfFrames = MAXFRAMES;
             if (self->minimumNumberOfFrames < 16) self->minimumNumberOfFrames = 16;
-            if (self->clientFormatSamplerate == 0) {
-                // The format query at creation time returned 0 (it can before
-                // AudioUnitInitialize). A client format with sample rate 0 inherits
-                // the hardware rate, so there is no divergence: adopt the reported
-                // rate as the baseline.
-                self->clientFormatSamplerate = sr;
-                [self performSelectorOnMainThread:@selector(applyBuffersize) withObject:nil waitUntilDone:NO];
-            } else if (sr != self->clientFormatSamplerate) {
-                // The hardware rate diverged from the rate the audio unit's client
-                // stream format was created with (e.g. the unit was created mid route
-                // change while a headset DAC was still negotiating). CoreAudio would
-                // silently resample through the stale client format, playing our
-                // output pitched/stretched by the rate ratio. Recreate the audio unit
-                // so the client format matches the settled hardware rate.
-                NSLog(@"SuperpoweredIOSAudioIO: hardware samplerate %i diverged from clientFormatSamplerate %i, recreating audio unit", sr, self->clientFormatSamplerate);
-                [self performSelectorOnMainThread:@selector(onMediaServerReset:) withObject:nil waitUntilDone:NO];
-            } else {
-                [self performSelectorOnMainThread:@selector(applyBuffersize) withObject:nil waitUntilDone:NO];
-            }
+            [self performSelectorOnMainThread:@selector(applyBuffersize) withObject:nil waitUntilDone:NO];
         }
     }
 }
@@ -533,17 +484,12 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
             self->inputBuffer->mBuffers[0].mNumberChannels = self->numberOfChannels;
             self->inputBuffer->mNumberBuffers = 1;
             OSStatus result = AudioUnitRender(self->audioUnit, ioActionFlags, inTimeStamp, 1, inNumberFrames, self->inputBuffer);
-
             if (!result) {
-                // We have input!
                 inputBuf = (float *)self->inputBuffer->mBuffers[0].mData;
-
-                // Check if inNumberFrames is large.
                 if (inNumberFrames > 1024 || inNumberFrames != nearestPowerOfTwo(inNumberFrames)) {
                     inputBufferStatusCode = 1;
                 }
             } else {
-                // No input. Result is negative.
                 inputBufferStatusCode = (int)result;
             }
         }
@@ -559,23 +505,18 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
             }
             self->inputBuffer->mNumberBuffers = self->numberOfChannels;
             OSStatus result = AudioUnitRender(self->audioUnit, ioActionFlags, inTimeStamp, 1, inNumberFrames, self->inputBuffer);
-
             if (!result) {
-                // We have input!
                 inputs = self->inputBufs;
-
-                // Check if inNumberFrames is large.
                 if (inNumberFrames > 1024 || inNumberFrames != nearestPowerOfTwo(inNumberFrames)) {
                     inputBufferStatusCode = 1;
                 }
             } else {
-                // No input. Result is negative.
                 inputBufferStatusCode = (int)result;
             }
         }
         // Make audio output.
         for (int n = 0; n < self->numberOfChannels; n++) self->outputBufs[n] = (float *)ioData->mBuffers[n].mData;
-        silence = !((audioProcessingCallbackNonInterleaved)self->processingCallback)(self->processingClientdata, inputs, self->outputBufs, inNumberFrames, self->samplerate, inTimeStamp->mHostTime, inputBufferStatusCode);
+        silence = !self->processingCallback(self->processingClientdata, inputs, self->outputBufs, inNumberFrames, self->samplerate, inTimeStamp->mHostTime, inputBufferStatusCode);
     }
 
     if (silence) { // Despite of ioActionFlags, it outputs garbage sometimes, so must zero the buffers:
@@ -591,32 +532,30 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
 - (AudioUnit)createRemoteIO {
     AudioUnit au;
     AudioComponentDescription desc;
-    desc.componentType = kAudioUnitType_Output;
-    desc.componentSubType = kAudioUnitSubType_RemoteIO;
-    desc.componentFlags = 0;
-    desc.componentFlagsMask = 0;
-    desc.componentManufacturer = kAudioUnitManufacturer_Apple;
-    AudioComponent component = AudioComponentFindNext(NULL, &desc);
-    if (AudioComponentInstanceNew(component, &au) != 0) return NULL;
+	desc.componentType = kAudioUnitType_Output;
+	desc.componentSubType = kAudioUnitSubType_RemoteIO;
+	desc.componentFlags = 0;
+	desc.componentFlagsMask = 0;
+	desc.componentManufacturer = kAudioUnitManufacturer_Apple;
+	AudioComponent component = AudioComponentFindNext(NULL, &desc);
+	if (AudioComponentInstanceNew(component, &au) != 0) return NULL;
 
     bool recordOnly = [audioSessionCategory isEqualToString:AVAudioSessionCategoryRecord];
     UInt32 value = recordOnly ? 0 : 1;
-    if (AudioUnitSetProperty(au, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Output, 0, &value, sizeof(value))) { AudioComponentInstanceDispose(au); return NULL; };
+	if (AudioUnitSetProperty(au, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Output, 0, &value, sizeof(value))) { AudioComponentInstanceDispose(au); return NULL; };
     value = inputEnabled ? 1 : 0;
-    if (AudioUnitSetProperty(au, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, 1, &value, sizeof(value))) { AudioComponentInstanceDispose(au); return NULL; };
+	if (AudioUnitSetProperty(au, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, 1, &value, sizeof(value))) { AudioComponentInstanceDispose(au); return NULL; };
+
+    AudioUnitAddPropertyListener(au, kAudioUnitProperty_StreamFormat, streamFormatChangedCallback, (__bridge void *)self);
 
     UInt32 size = 0;
     AudioUnitGetPropertyInfo(au, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &size, NULL);
     AudioStreamBasicDescription format;
     AudioUnitGetProperty(au, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &format, &size);
 
-    samplerate = clientFormatSamplerate = (int)format.mSampleRate;
+    samplerate = (int)format.mSampleRate;
 
-    // Register the listener after clientFormatSamplerate is set, so a format event
-    // firing during creation can't compare against a stale baseline.
-    AudioUnitAddPropertyListener(au, kAudioUnitProperty_StreamFormat, streamFormatChangedCallback, (__bridge void *)self);
-
-    format.mFormatID = kAudioFormatLinearPCM;
+	format.mFormatID = kAudioFormatLinearPCM;
     format.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked | kAudioFormatFlagsNativeEndian;
     if (!interleaved) format.mFormatFlags |= kAudioFormatFlagIsNonInterleaved;
     format.mBitsPerChannel = 32;
@@ -626,28 +565,16 @@ static OSStatus coreAudioProcessingCallback(void *inRefCon, AudioUnitRenderActio
     if (AudioUnitSetProperty(au, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &format, sizeof(format))) { AudioComponentInstanceDispose(au); return NULL; };
     if (AudioUnitSetProperty(au, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, &format, sizeof(format))) { AudioComponentInstanceDispose(au); return NULL; };
 
-    AURenderCallbackStruct callbackStruct;
-    callbackStruct.inputProc = coreAudioProcessingCallback;
-    callbackStruct.inputProcRefCon = (__bridge void *)self;
+	AURenderCallbackStruct callbackStruct;
+	callbackStruct.inputProc = coreAudioProcessingCallback;
+	callbackStruct.inputProcRefCon = (__bridge void *)self;
     if (recordOnly) {
         if (AudioUnitSetProperty(au, kAudioOutputUnitProperty_SetInputCallback, kAudioUnitScope_Global, 0, &callbackStruct, sizeof(callbackStruct))) { AudioComponentInstanceDispose(au); return NULL; };
     } else {
         if (AudioUnitSetProperty(au, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &callbackStruct, sizeof(callbackStruct))) { AudioComponentInstanceDispose(au); return NULL; };
     };
 
-    if (AudioUnitInitialize(au)) { AudioComponentInstanceDispose(au); return NULL; };
-
-    // The pre-initialize format query can return 0. Now that the unit is
-    // initialized, read back the client-side format to record the rate the unit
-    // will actually interpret our samples with — the baseline for detecting a
-    // stale client format after the hardware rate settles.
-    UInt32 clientSize = 0;
-    AudioStreamBasicDescription clientFormat;
-    AudioUnitGetPropertyInfo(au, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &clientSize, NULL);
-    if (!AudioUnitGetProperty(au, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &clientFormat, &clientSize) && (clientFormat.mSampleRate != 0)) {
-        clientFormatSamplerate = (int)clientFormat.mSampleRate;
-    }
-    NSLog(@"SuperpoweredIOSAudioIO: createRemoteIO clientFormatSamplerate=%i", clientFormatSamplerate);
+	if (AudioUnitInitialize(au)) { AudioComponentInstanceDispose(au); return NULL; };
     return au;
 }
 
